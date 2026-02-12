@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+httpx
+pycryptodome
+python-multipart
+pydantic
