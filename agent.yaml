@@ -1,0 +1,41 @@
+version: "1.0"
+project:
+  name: "Sairam Student Dashboard Ultra-Neo"
+  description: "High-performance, mobile-first Student Dashboard with Glassmorphism 2.0 aesthetics."
+  repository: "https://github.com/aravi/edumate"
+
+architecture:
+  frontend:
+    framework: "Next.js 14 (App Router)"
+    styling: "Tailwind CSS + Framer Motion"
+    theme: "Sleek Dark Mode (Vibrant Indigo & Electric Cyan)"
+    deployment: "Vercel"
+  backend:
+    framework: "FastAPI (Python 3.10+)"
+    proxy: "Reverse Proxy for Sairam API"
+    security: "AES-256-ECB Encryption (PyCryptodome)"
+    database: "None - Direct API Proxy"
+
+secrets:
+  SAIRAM_API_KEY_BASE64: "9vcPlytFC4ck0X0gvm+Y6+m0vgCAnq0xDFd3X6pBijtozwmOjntoUCwzpSxLZ0GP2PtDkkJERESxdG1bdt8w=="
+
+tasks:
+  - id: "backend-setup"
+    name: "Initialize FastAPI Backend"
+    steps:
+      - "Install dependencies: fastapi, uvicorn, pycryptodome, httpx"
+      - "Implement AES-256-ECB encryption logic"
+      - "Create proxy endpoints for Login, Profile, Dashboard"
+  
+  - id: "frontend-setup"
+    name: "Initialize Next.js Frontend"
+    steps:
+      - "npx create-next-app@latest"
+      - "Configure Tailwind CSS with custom glassmorphism utilities"
+      - "Implement Dashboard Layout and animations"
+
+  - id: "integration"
+    name: "Connect Frontend to Backend"
+    steps:
+      - "Configure API proxy in Next.js or via environment variables"
+      - "Verify data flow and error handling"
