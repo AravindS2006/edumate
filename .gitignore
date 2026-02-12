@@ -1,0 +1,33 @@
+# ─── Sensitive / HAR files (contain tokens & credentials) ───
+*.har
+har_api_details.json
+har_urls.txt
+
+# ─── Backend ───
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+backend/debug_output.json
+backend/debug_sairam.py
+*.pyc
+
+# ─── Frontend ───
+frontend/.next/
+frontend/node_modules/
+frontend/build.log
+frontend/tsconfig.tsbuildinfo
+
+# ─── Vercel API (serverless) ───
+api/__pycache__/
+
+# ─── IDE / OS ───
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# ─── Dev / Debug scripts ───
+verify_backend.py
+setup_backend.bat
