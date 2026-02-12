@@ -4,6 +4,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 import json
+from mangum import Mangum
+
+# Import crypto_utils from same directory
+import importlib, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from crypto_utils import encrypt_data, decrypt_data
 
 app = FastAPI()
@@ -512,6 +517,9 @@ async def get_inbox(request: Request, receiver_id: str):
         print(f"[Inbox] Exception: {e}")
         
     return {"unread_count": 0, "categories": []}
+
+# Vercel Serverless Handler
+handler = Mangum(app, lifespan="off")
 
 if __name__ == "__main__":
     import uvicorn
