@@ -7,9 +7,25 @@ import { useRouter } from 'next/navigation';
 
 // --- Types ---
 interface DashboardData {
-    stats: any;
-    academic: any;
-    personal: any;
+    stats: {
+        attendance_percentage: number;
+        cgpa: number;
+        arrears: number;
+        od_percentage: number;
+    };
+    academic: {
+        dept: string;
+        semester: number;
+        section: string;
+        batch: string;
+    };
+    personal: {
+        name: string;
+        reg_no: string;
+        photo_id: string;
+        email: string;
+        dept: string;
+    };
 }
 
 const containerVariants = {
@@ -58,11 +74,16 @@ export default function Dashboard() {
 
         // 2. Fetch Initial Data
         const fetchData = async () => {
+            const headers = {
+                'Authorization': `Bearer ${token}`
+            };
+
             try {
+                const encodedId = encodeURIComponent(storedId);
                 const [statsRes, academicRes, personalRes] = await Promise.all([
-                    fetch(`http://localhost:8000/api/dashboard/stats?studtblId=${storedId}`),
-                    fetch(`http://localhost:8000/api/student/academic?studtblId=${storedId}`),
-                    fetch(`http://localhost:8000/api/student/personal?studtblId=${storedId}`)
+                    fetch(`http://localhost:8000/api/dashboard/stats?studtblId=${encodedId}`, { headers }),
+                    fetch(`http://localhost:8000/api/student/academic?studtblId=${encodedId}`, { headers }),
+                    fetch(`http://localhost:8000/api/student/personal?studtblId=${encodedId}`, { headers })
                 ]);
 
                 const stats = await statsRes.json();
@@ -83,8 +104,12 @@ export default function Dashboard() {
     const fetchReport = async (type: 'attendance' | 'cat' | 'endsem') => {
         setReportData(null);
         setActiveReport(type);
+        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`http://localhost:8000/api/reports?type=${type}&studtblId=${studtblId}`);
+            const encodedId = encodeURIComponent(studtblId);
+            const res = await fetch(`http://localhost:8000/api/reports?type=${type}&studtblId=${encodedId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const json = await res.json();
             setReportData(json);
         } catch (e) {
@@ -130,13 +155,8 @@ export default function Dashboard() {
                     <div className="relative">
                         <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-indigo-500 to-cyan-400">
                             <div className="w-full h-full rounded-full overflow-hidden bg-slate-900">
-                                {/* Proxy Image */}
-                                <img
-                                    src={`http://localhost:8000/api/profile/image?studtblId=${studtblId}`}
-                                    onError={(e) => { e.currentTarget.src = "https://ui-avatars.com/api/?name=S+S&background=random"; }}
-                                    alt="Profile"
-                                    className="w-full h-full object-cover"
-                                />
+                                {/* Image Fetcher Component or basic Img with State since we need headers */}
+                                <ProfileImage studtblId={studtblId} documentId={data?.personal?.photo_id} />
                             </div>
                         </div>
                     </div>
@@ -260,5 +280,44 @@ export default function Dashboard() {
                 }}><LogOut size={24} /></button>
             </div >
         </div >
+    );
+}
+
+// --- Helper Component for Authenticated Image ---
+function ProfileImage({ studtblId, documentId }: { studtblId: string, documentId?: string }) {
+    const [src, setSrc] = useState<string>("https://ui-avatars.com/api/?name=S+S&background=random");
+
+    useEffect(() => {
+        if (!studtblId || !documentId) return;
+
+        const fetchImage = async () => {
+            const token = localStorage.getItem('token');
+            const encodedId = encodeURIComponent(studtblId);
+            const encodedDocId = encodeURIComponent(documentId);
+
+            try {
+                const res = await fetch(`http://localhost:8000/api/profile/image?studtblId=${encodedId}&documentId=${encodedDocId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    setSrc(url);
+                }
+            } catch (e) {
+                console.error("Failed to load profile image", e);
+            }
+        };
+
+        fetchImage();
+    }, [studtblId, documentId]);
+
+    return (
+        <img
+            src={src}
+            alt="Profile"
+            className="w-full h-full object-cover"
+            onError={(e) => { e.currentTarget.src = "https://ui-avatars.com/api/?name=S+S&background=random"; }}
+        />
     );
 }
