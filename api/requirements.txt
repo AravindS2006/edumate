@@ -3,4 +3,3 @@ httpx
 pycryptodome
 python-multipart
 pydantic
-mangum
