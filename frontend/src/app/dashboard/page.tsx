@@ -88,7 +88,7 @@ interface ParentData {
 
 /* ─────────────────────────────── Constants ─────────────────────────── */
 
-const API = 'http://localhost:8000';
+const API = process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : '';
 
 const FADE_UP = {
     hidden: { opacity: 0, y: 24 },
