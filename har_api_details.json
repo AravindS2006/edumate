@@ -1,0 +1,100 @@
+{
+  "User/Login": {
+    "method": "POST",
+    "url": "https://student.sairam.edu.in/studapi/User/Login",
+    "status": 200,
+    "post_body": "{\"userName\":\"1xwbVwXr5VouXHYlEi7NptkW1wOz+nOhro9f27gBdVw=\",\"password\":\"7dGm5eoy2VxsD+CHZfn7+g==\"}",
+    "response_preview": "{\"valid\":false,\"email\":\"sec23ec242@sairamtap.edu.in\",\"idToken\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IjRiMTFjYjdhYjVmY2JlNDFlOTQ4MDk0ZTlkZjRjNWI1ZWNhMDAwOWUiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiQVJBVklORFNFTFZBTiIsImlzcyI6Imh0dHBzOi8vc2VjdXJldG9rZW4uZ29vZ2xlLmNvbS9lZHVtYXRlLXNhaXNlYy1zdGFmZiIsImF1ZCI6ImVkdW1hdGUtc2Fpc2VjLXN0YWZmIiwiYXV0aF90aW1lIjoxNzcwOTEwNjUyLCJ1c2VyX2lkIjoicDFqdFVkSENjTFhMaDFLdWwxUjJEOW53NWxDMyIsInN1YiI6InAxanRVZEhDY0xYTGgxS3VsMVIyRDludzVsQzMiLCJpYXQiOjE3NzA5MTA2NTIsImV4cCI6MTc3MDkxNDI1MiwiZW1haWwiOiJzZWMyM2VjMjQyQHNhaXJhbXRhcC5lZHUuaW4iLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZW1haWwiOlsic2VjMjNlYzI0MkBzYWlyYW10YXAuZWR1LmluIl19LCJzaWduX2luX3Byb3ZpZGVyIjoicGFzc3dvcmQifX0.d9pKB5la-Gh9vR4gA5ZOoELLrcER9J5mMH7d297uEo0ip85sFJM4m9q4c2ZaYASYnOJl6pLZRuWyHYhFmgRZ22MZW"
+  },
+  "Student/GetStudentAcademicDetails": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Student/GetStudentAcademicDetails?studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Academic details retrieved successfully.\",\"data\":[{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"admissionMode\":\"TNEA\",\"admittedYear\":\"2023\",\"academicBatchYear\":\"2023-2027\",\"studentDepartment\":\"Electronics and Communication Engineering\",\"mentorName\":\"J. Sandhya\",\"universityRegNo\":\"2303412510621023\",\"academicYearId\":14,\"branchId\":2,\"yearOfStudyId\":3,\"sectionId\":2,\"currentSemsterId\":6,\"semesterName\":\"VI SEM\",\"semesterType\":\"Even\",\"programmeId\":1,\"hostel\":false,\"busCode\":\"P52\",\"institutionId\":1,\"resultPublishYearID\":0,\"publishYear\":null,\"publishYearHallTicket\":null,\"academicBatchId\":61,\"currentAcademicYear\":\"2025-2026\",\"currentSemster\":6},{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"admissionMode\":\"TNEA\",\"admittedYear\":\"2023\",\"academicBatchYear\":\"2023-2027\",\"studentDepartment"
+  },
+  "Dashboard/GetWeeklyTimetableByClass": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Dashboard/GetWeeklyTimetableByClass?branchId=2&yearOfStudyId=3&sectionId=2&semesterId=6&academicYearId=14&studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Weekly Timetable retrieved successfully.\",\"data\":[{\"day\":\"MON\",\"timeSlots\":{\"9:00AM - 9:50AM\":\"20HSPL501-CSS LABCSS LAB ~ 42436\",\"9:50AM - 10:40AM\":\"20HSPL501-CSS LABCSS LAB ~ 42436\",\"10:55AM - 11:45AM\":\"20ECPC603-WC ~ 42530\",\"11:45AM - 12:35PM\":\"20ECPC601-TLA ~ 42528\",\"1:25PM - 2:15PM\":\"20ECPL601-Antenna LabAntenna Lab ~ 42536 | 20ECPL601-Antenna LabAntenna Lab ~ 42536 | 20ECPL602-Network LabNetwork Lab ~ 42537 | 20ECPL602-Network LabNetwork Lab ~ 42537\",\"2:15PM - 3:05PM\":\"20ECPL601-Antenna LabAntenna Lab ~ 42536 | 20ECPL601-Antenna LabAntenna Lab ~ 42536 | 20ECPL602-Network LabNetwork Lab ~ 42537 | 20ECPL602-Network LabNetwork Lab ~ 42537\",\"3:20PM - 4:10PM\":\"20ECPL601-Antenna LabAntenna Lab ~ 42536 | 20ECPL601-Antenna LabAntenna Lab ~ 42536 | 20ECPL602-Network "
+  },
+  "Dashboard/GetStudentDashboardDetails": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Dashboard/GetStudentDashboardDetails?studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Student Dashboard Details retrieved successfully.\",\"data\":[{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"studentName\":\"ARAVINDSELVAN\",\"program\":\"BE / B.Tech\",\"branchName\":\"Electronics and Communication Engineering\",\"branchCode\":\"ECE\",\"section_Name\":\"B\",\"mentorName\":\"J. Sandhya\",\"semesterNo\":6,\"totalYears\":4,\"totalSemesters\":8,\"semester_Name\":\"VI SEM\",\"uG_Cgpa\":6.95,\"pG_Cgpa\":5.25,\"attendancePercentage\":67.54,\"absentPercentage\":32.46,\"odCount\":38,\"odPercentage\":22.75},{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"studentName\":\"ARAVINDSELVAN\",\"program\":\"BE / B.Tech\",\"branchName\":\"Electronics and Communication Engineering\",\"branchCode\":\"ECE\",\"section_Name\":\"B\",\"mentorName\":\"R. Selvarajan\",\"semesterNo\":6,\"totalYears\":4,\"totalSemesters\":8,\"semester_Name\":\"VI SEM\",\"uG_Cgpa\":6.95"
+  },
+  "Student/GetStudentPersonalDetails": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Student/GetStudentPersonalDetails?studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Student details retrieved successfully.\",\"data\":{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"studRollNo\":\"SEC23EC242\",\"studentName\":\"ARAVINDSELVAN C\",\"dateOfBirth\":\"16/05/2006\",\"languageKnown\":\"TAMI,ENGLISH\",\"currentAge\":\"19\",\"gender\":\"Male\",\"religion\":\"Hindu\",\"community\":\"BC\",\"caste\":\"Kongu Vellalar\",\"officialEmailid\":\"SEC23EC242@sairamtap.edu.in\",\"photoDocumentId\":\"tdN4BQKuPTzj9130EWB8Gw==\",\"studentPhotoPath\":\"STUDENT_P.jpg\",\"panNo\":\"DAGPC1741F\",\"panDocumentId\":\"FqtrMb4q5OEqzw6ZYyKjYw==\",\"studentPanPath\":\"PAN_No.pdf\",\"passportNo\":null,\"bankAccountNo\":null,\"bankName\":null,\"ccRegNo\":null,\"aadhaarName\":\"********8684\",\"aadharDocumentId\":\"YEBnJIitUTv4eRxT8DRCSA==\",\"studentAadharPath\":\"IMG_20240111_194616.jpg\",\"busRoute\":\"P52-Parvathi Nagar (Mudichur)\",\"createdDate\":\"202"
+  },
+  "PayUp/GetCurrencyMaster": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/PayUp/GetCurrencyMaster",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"CurrencyMaster retrieved successfully.\",\"data\":[{\"currencyID\":1,\"currencyCode\":\"INR\",\"currencyName\":\"Indian Rupee\",\"currencySymbol\":\"\u20b9\",\"countryCode\":\"IND\"}],\"statusCode\":200}"
+  },
+  "Inbox/GetUnreadCategories": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Inbox/GetUnreadCategories?Receiver=SEC23EC242",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":false,\"message\":\"No unread categories found.\",\"data\":null,\"statusCode\":200}"
+  },
+  "Document/DownloadBlob": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Document/DownloadBlob?documentId=tdN4BQKuPTzj9130EWB8Gw%3D%3D&studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "/9j/4R7eRXhpZgAASUkqAAgAAAAQAAABAwABAAAAIBAAAAEBAwABAAAAMBgAAAIBAwADAAAAzgAAAAYBAwABAAAAAgAAAA8BAgASAAAA1AAAABABAgALAAAA5gAAABIBAwABAAAAAQAAABUBAwABAAAAAwAAABoBBQABAAAA8QAAABsBBQABAAAA+QAAACgBAwABAAAAAgAAADEBAgAeAAAAAQEAADIBAgAUAAAAHwEAABMCAwABAAAAAgAAAGmHBAABAAAANAEAACWIBAABAAAAKAQAADwEAAAIAAgACABOSUtPTiBDT1JQT1JBVElPTgBOSUtPTiBEODUwAMDGLQAQJwAAwMYtABAnAABBZG9iZSBQaG90b3Nob3AgQ1M2IChXaW5kb3dzKQAyMDIzOjEwOjE2IDExOjQ1OjE2AAAtAJqCBQABAAAAVgMAAJ2CBQABAAAAXgMAACKIAwABAAAAAQAAACeIAwABAAAAkAEAADCIAwABAAAAAgAAADKIBAABAAAAkAEAAACQBwAEAAAAMDIzMQOQAgAUAAAAZgMAAASQAgAUAAAAegMAABCQAgAHAAAAjgMAABGQAgAHAAAAlQMAABKQAgAHAAAAnAMAAAGRBwAEAAAAAQIDAAKRBQABAAAAowMAAAGSCgABAAAAqwMAAAKSBQABAAAAswMAAASSCgABAAAAuwMAAAWSBQABAAAAwwMAAAeSAwABAAAABQAAAAiSAwABAAAACQAAAAmSAwABAAAAAAAAAAqSBQABAAAAywMAAIaSBwAsAAAA0wMAAJCS"
+  },
+  "Student/GetStudentAcademicPercentage": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Student/GetStudentAcademicPercentage?studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Academic percentage details retrieved successfully.\",\"data\":[{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"qualifiedExam\":\"HSC\",\"yearOfPassing\":\"2023\",\"aPercentage\":\"86.50\"},{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"qualifiedExam\":\"SSLC\",\"yearOfPassing\":\"2020\",\"aPercentage\":\"100.00\"}],\"statusCode\":200}"
+  },
+  "Student/GetStudentParentDetails": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Student/GetStudentParentDetails?studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Student parent details retrieved successfully.\",\"data\":{\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\",\"fatherName\":\"Chellamuthu\",\"fatherOccupation\":\"Late\",\"fatherMobileNo\":\"9942111267\",\"fatherOfficeAddress\":null,\"fatherEmailId\":null,\"fatherDocumentId\":\"\",\"fatherPhotoPath\":\"\",\"motherName\":\"Vellaithai\",\"motherOccupation\":\"Late\",\"motherMobileNo\":null,\"motherOfficeAddress\":null,\"motherEmailId\":null,\"motherDocumentId\":\"\",\"motherPhotoPath\":\"\",\"guardianName\":null,\"guardianOccupation\":\"Agriculture Services\",\"guardianMobileNo\":null,\"guardianEmailId\":null,\"guardianOfficeAddress\":null,\"guardianDocumentId\":\"\",\"guardianPhotoPath\":\"\",\"createdDate\":null,\"createdBy\":null,\"modifiedDate\":null,\"modifiedBy\":null},\"statusCode\":200}"
+  },
+  "HallTicket/GetStudentExamStatus": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/HallTicket/GetStudentExamStatus?studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D&AcademicYearId=14&YearOfStudyId=3&SemesterId=6&BranchId=2&SectionId=2&presemesterType=Even",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Student exam status retrieved successfully.\",\"data\":{\"attendancePercentage\":67.54,\"absentPercentage\":32.46,\"odPercentage\":22.75,\"fees\":25000.00,\"trustOfficeFees\":0.00,\"onlinePaymentFees\":25000.00,\"hostelFees\":0.00,\"bookFees\":0.00,\"previousFeeDue\":0.00,\"isAttendanceEligible\":true,\"isFeesEligible\":true,\"isSubmitEnabled\":false,\"currentStatus\":\"Result Publish Not Available\",\"feeStatus\":\"\",\"registerLastDate\":null,\"lastDueDate\":\"2026-01-27T00:00:00\"},\"statusCode\":200}"
+  },
+  "Report/GetReportMenuWithSubCategories": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Report/GetReportMenuWithSubCategories",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Report menu retrieved successfully.\",\"data\":[{\"reportName\":\"Academics\",\"reportId\":3,\"reportSubMenu\":[{\"reportSubId\":9,\"reportSubName\":\"Attendance\",\"status\":false,\"reportId\":0,\"reportName\":null},{\"reportSubId\":10,\"reportSubName\":\"Mentoring\",\"status\":false,\"reportId\":0,\"reportName\":null}]},{\"reportName\":\"Admin\",\"reportId\":2,\"reportSubMenu\":[{\"reportSubId\":7,\"reportSubName\":\"Fees Excemption\",\"status\":false,\"reportId\":0,\"reportName\":null},{\"reportSubId\":8,\"reportSubName\":\"Fees Permission\",\"status\":false,\"reportId\":0,\"reportName\":null},{\"reportSubId\":6,\"reportSubName\":\"Scholarship\",\"status\":false,\"reportId\":0,\"reportName\":null}]},{\"reportName\":\"Events\",\"reportId\":5,\"reportSubMenu\":[{\"reportSubId\":14,\"reportSubName\":\"Co-Curricular\",\"status\":false,\"reportId\":0,\"reportNa"
+  },
+  "Report/GetReportFilterByReportId": {
+    "method": "GET",
+    "url": "https://student.sairam.edu.in/studapi/Report/GetReportFilterByReportId?ReportSubId=9&studtblId=HPHLbMd%2BaXKusfSfL79e5w%3D%3D",
+    "status": 200,
+    "post_body": "",
+    "response_preview": "{\"success\":true,\"message\":\"Filter retrieved successfully.\",\"data\":{\"semesterData\":[{\"semesterId\":1,\"yearOfStudyId\":0,\"semesterCode\":null,\"semesterNo\":1,\"semesterName\":\"I SEM\",\"semesterType\":null,\"activeSemester\":0,\"semesterShortCode\":null,\"status\":0},{\"semesterId\":2,\"yearOfStudyId\":0,\"semesterCode\":null,\"semesterNo\":2,\"semesterName\":\"II SEM\",\"semesterType\":null,\"activeSemester\":0,\"semesterShortCode\":null,\"status\":0},{\"semesterId\":3,\"yearOfStudyId\":0,\"semesterCode\":null,\"semesterNo\":3,\"semesterName\":\"III SEM\",\"semesterType\":null,\"activeSemester\":0,\"semesterShortCode\":null,\"status\":0},{\"semesterId\":4,\"yearOfStudyId\":0,\"semesterCode\":null,\"semesterNo\":4,\"semesterName\":\"IV SEM\",\"semesterType\":null,\"activeSemester\":0,\"semesterShortCode\":null,\"status\":0},{\"semesterId\":5,\"yearOfStudyId\":0,\"semest"
+  },
+  "Report/ReportsByName": {
+    "method": "POST",
+    "url": "https://student.sairam.edu.in/studapi/Report/ReportsByName",
+    "status": 200,
+    "post_body": "{\"reportName\":\"Attendance\",\"semesterId\":4,\"studtblId\":\"HPHLbMd+aXKusfSfL79e5w==\"}",
+    "response_preview": "JVBERi0xLjcNCjIgMCBvYmoNClsvUERGIC9UZXh0IC9JbWFnZUIgL0ltYWdlQyAvSW1hZ2VJXQ0KZW5kb2JqDQo4IDAgb2JqDQo8PC9MZW5ndGggOSAwIFINCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlID4+DQpzdHJlYW0NClgJvVtdj9s2Fn0PkP/AlwV2F4gikhJFzZvjeBcDzEynYzdFUPTB41Fm3PXHruy0yL/fS4m8okzKNi3BLTqZ3kj3HN5zD0VJ1Pt3/yMZi2JC4yzKKRGJhP9JOIRyUhbkV7J5/y6OEspIHGU8g59wVPlaHU9FSjijUapOZBFLCc0iAX/Aid/eQ2Ya5/ogXh2Uyuogbg6qsn+akY//Skge5XlOZt9IXP0LEEnKooxKMrsjlIlIigQSyYhmgsxeyN+n0cP2H2T2B5n9k0xm79/93EFU5BBtiFIGTCV3qGZUH1ZTpVTWh4WTZXEcxVS0yX5//qNY7Mfbl+IMziynkcgz5MzSzFNdlnN9FNdH8QvLyyXk9zMmD/P1OZRTaJw8kU2ZeeKhnKaxPkpXmccXUk4FsKgyNZRH+32xeZlvFgV5LMpFsdnPXw+5W00Zp1EuRI+m5GmUxtCUNI5SXlOgLpxpLA3Xq7Hg15S1AFn8aTr+ymIXGNtDA1/eHlUmKVu4k82fy3K7Wasir8h0sSxU2eebFzLZvC43RVEuN68OJ9TfFONi/QXMP6JNicZxp9hMyognfWYgLTbLWSRzXftOsQ1cL7EplKiNB1rfj5IjWhvc/lrbuI/l9nn+vFwt9z/I"
+  }
+}
