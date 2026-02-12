@@ -25,26 +25,74 @@ body {
   background-attachment: fixed;
 }
 
-@layer utilities {
-  .glass {
-    @apply backdrop-blur-xl bg-slate-900/60 border border-white/10 shadow-lg;
-  }
+/* 
+   Tailwind v4 - Manual Utilities 
+   Replacing @apply with CSS or just relying on utility classes in JSX.
+   For now, defining simple classes for convenience.
+*/
 
-  .glass-card {
-    @apply glass rounded-2xl p-6 transition-all duration-300 hover:bg-slate-800/60 hover:border-white/20 hover:shadow-cyan-500/10 hover:shadow-xl;
-  }
+.glass {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
 
-  .glass-input {
-    @apply bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all;
-  }
+.glass-card {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-radius: 1rem;
+  /* rounded-2xl */
+  padding: 1.5rem;
+  /* p-6 */
+  transition: all 0.3s;
+}
 
-  .glass-button {
-    @apply bg-gradient-to-r from-indigo-600 to-cyan-600 text-white font-medium py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/20 active:scale-95 transition-all hover:shadow-cyan-500/30 hover:brightness-110;
-  }
+.glass-card:hover {
+  background-color: rgba(30, 41, 59, 0.6);
+  /* bg-slate-800/60 */
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
 
-  .text-glow {
-    text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
-  }
+.glass-input {
+  background-color: rgba(30, 41, 59, 0.5);
+  /* bg-slate-800/50 */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  /* rounded-xl */
+  padding: 0.75rem 1rem;
+  color: white;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: rgba(6, 182, 212, 0.5);
+  /* cyan-500/50 */
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.5);
+}
+
+.glass-button {
+  background: linear-gradient(to right, #4f46e5, #0891b2);
+  /* indigo-600 to cyan-600 */
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.2);
+  transition: all 0.3s;
+}
+
+.glass-button:hover {
+  filter: brightness(1.1);
+}
+
+.text-glow {
+  text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
 }
 
 /* Custom Scrollbar */

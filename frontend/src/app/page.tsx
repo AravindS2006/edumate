@@ -9,6 +9,7 @@ export default function Home() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  // const router = useRouter(); // Commented out to avoid unused var warning if not used yet, but it is used.
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -24,12 +25,21 @@ export default function Home() {
 
       const data = await res.json();
 
-      if (data.token || data.status === 'success') {
-        // Store token/user (Mock)
-        localStorage.setItem('token', data.token || 'mock_token');
+      // Robust Auth Handling
+      if (res.ok) {
+        // Store everything we get to be safe
+        if (data.token) localStorage.setItem('token', data.token);
+        if (data.studtblId) localStorage.setItem('studtblId', data.studtblId);
+        if (data.access_token) localStorage.setItem('token', data.access_token);
+
+        // Fallback for mock if needed
+        if (!data.studtblId && !data.token && !data.access_token) {
+          console.warn("No token/id found in response, strictly mocking?");
+        }
+
         router.push('/dashboard');
       } else {
-        alert('Login failed: ' + (data.error || 'Unknown error'));
+        alert('Login failed: ' + (data.detail || data.error || 'Unknown error'));
       }
     } catch (err) {
       console.error(err);

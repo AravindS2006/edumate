@@ -2,51 +2,74 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bell, BookOpen, Calendar, ChevronRight, LogOut, Menu, User } from 'lucide-react';
+import { Bell, BookOpen, Calendar, ChevronRight, LogOut, Menu, User, FileText, BarChart3, GraduationCap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-// Mock Data Types
-interface StudentData {
-    name: string;
-    reg_no: string;
-    dept: string;
-    avatar?: string;
+// --- Types ---
+interface DashboardData {
+    stats: any;
+    academic: any;
+    personal: any;
 }
 
-interface DashboardStats {
-    attendance: number;
-    cgpa: number;
-    assignments_pending: number;
-}
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1
+        }
+    }
+};
+
+const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    show: { y: 0, opacity: 1 }
+};
 
 export default function Dashboard() {
     const router = useRouter();
-    const [student, setStudent] = useState<StudentData | null>(null);
-    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [data, setData] = useState<DashboardData | null>(null);
+    const [activeReport, setActiveReport] = useState<'attendance' | 'cat' | 'endsem' | null>(null);
+    const [reportData, setReportData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [studtblId, setStudtblId] = useState<string>('');
+
+    // Assets
+    const ASSETS = {
+        founder: "https://student.sairam.edu.in/assets/sairam-founder-SphLKZaX.png",
+        logo1: "https://student.sairam.edu.in/assets/sairam-logo1-BVt3-ItC.png",
+        logo2: "https://student.sairam.edu.in/assets/sairam-logo2-BsAIYXw5.png",
+        together: "https://student.sairam.edu.in/assets/sairam-together-CqE6rdiK.png"
+    };
 
     useEffect(() => {
-        // Check auth
+        // 1. Auth Check
         const token = localStorage.getItem('token');
+        // For now, we'll assume the login mock returns a studtblId or we default to a mock one
+        // In a real flow, this comes from the login response
+        const storedId = localStorage.getItem('studtblId') || '12345';
+        setStudtblId(storedId);
+
         if (!token) {
             router.push('/');
             return;
         }
 
-        // Fetch Dashboard Data (Mock)
+        // 2. Fetch Initial Data
         const fetchData = async () => {
             try {
-                const res = await fetch('http://localhost:8000/api/dashboard');
-                const data = await res.json();
-                setStats(data);
+                const [statsRes, academicRes, personalRes] = await Promise.all([
+                    fetch(`http://localhost:8000/api/dashboard/stats?studtblId=${storedId}`),
+                    fetch(`http://localhost:8000/api/student/academic?studtblId=${storedId}`),
+                    fetch(`http://localhost:8000/api/student/personal?studtblId=${storedId}`)
+                ]);
 
-                // Mock Student Profile
-                setStudent({
-                    name: "Sairam Student",
-                    reg_no: "412345678",
-                    dept: "Computer Science",
-                    // Use a placeholder if no image
-                });
+                const stats = await statsRes.json();
+                const academic = await academicRes.json();
+                const personal = await personalRes.json();
+
+                setData({ stats, academic, personal });
             } catch (err) {
                 console.error("Failed to load dashboard data", err);
             } finally {
@@ -57,6 +80,18 @@ export default function Dashboard() {
         fetchData();
     }, [router]);
 
+    const fetchReport = async (type: 'attendance' | 'cat' | 'endsem') => {
+        setReportData(null);
+        setActiveReport(type);
+        try {
+            const res = await fetch(`http://localhost:8000/api/reports?type=${type}&studtblId=${studtblId}`);
+            const json = await res.json();
+            setReportData(json);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
@@ -65,135 +100,165 @@ export default function Dashboard() {
         );
     }
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        show: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1
-            }
-        }
-    };
-
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        show: { y: 0, opacity: 1 }
-    };
-
     return (
-        <div className="min-h-screen pb-24 relative">
-            {/* Header */}
-            <header className="glass sticky top-0 z-50 px-6 py-4 flex justify-between items-center rounded-b-3xl mb-6">
-                <div className="flex items-center space-x-3">
-                    <div className="relative">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-cyan-500 p-[2px]">
-                            <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
-                                {student?.avatar ? (
-                                    <img src={student.avatar} alt="Profile" className="w-full h-full object-cover" />
-                                ) : (
-                                    <User size={20} className="text-white" />
-                                )}
-                            </div>
-                        </div>
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
-                    </div>
-                    <div>
-                        <h2 className="text-sm font-bold text-white leading-tight">{student?.name}</h2>
-                        <p className="text-[10px] text-slate-400 font-medium tracking-wide">{student?.dept} • {student?.reg_no}</p>
-                    </div>
+        <div className="min-h-screen pb-24 relative bg-[#0f172a] text-slate-100">
+
+            {/* --- Header / Branding --- */}
+            <div className="absolute top-0 w-full h-64 bg-gradient-to-b from-indigo-900/40 to-transparent pointer-events-none z-0"></div>
+
+            <header className="relative z-50 pt-6 px-6 pb-2 flex justify-between items-start">
+                <div className="flex flex-col">
+                    <img src={ASSETS.logo1} alt="Sairam Logo" className="h-8 object-contain mb-2 w-auto self-start" />
+                    <p className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">Student Portal</p>
                 </div>
-                <button className="p-2 rounded-full hover:bg-white/5 transition-colors relative">
-                    <Bell size={20} className="text-slate-300" />
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                </button>
+                <img src={ASSETS.founder} alt="Founder" className="h-12 w-12 rounded-full border-2 border-white/10 shadow-lg object-cover" />
             </header>
 
-            <main className="px-6 space-y-6">
+            {/* --- Main Content --- */}
+            <motion.main
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="px-6 relative z-10 mt-4 space-y-6"
+            >
+
+                {/* Profile Card */}
                 <motion.div
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="space-y-6"
+                    variants={itemVariants}
+                    className="glass-card flex items-center space-x-4"
                 >
-                    {/* Main Stats Card (Circular Progress) */}
-                    <motion.div variants={itemVariants} className="glass-card flex flex-col items-center relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <BookOpen size={100} />
+                    <div className="relative">
+                        <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-indigo-500 to-cyan-400">
+                            <div className="w-full h-full rounded-full overflow-hidden bg-slate-900">
+                                {/* Proxy Image */}
+                                <img
+                                    src={`http://localhost:8000/api/profile/image?studtblId=${studtblId}`}
+                                    onError={(e) => { e.currentTarget.src = "https://ui-avatars.com/api/?name=S+S&background=random"; }}
+                                    alt="Profile"
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
                         </div>
-                        <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Overall Attendance</h3>
-                        <div className="relative w-40 h-40 flex items-center justify-center">
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">{data?.personal?.name || "Student"}</h2>
+                        <p className="text-xs text-slate-400">{data?.academic?.dept}</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                                Sem {data?.academic?.semester}
+                            </span>
+                            <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                                {data?.personal?.reg_no}
+                            </span>
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Attendance */}
+                    <motion.div variants={itemVariants} className="glass-card p-4 flex flex-col items-center justify-center relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-2 opacity-5"><Calendar size={80} /></div>
+                        <div className="relative w-24 h-24">
                             <svg className="w-full h-full transform -rotate-90">
-                                <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-slate-800" />
-                                <circle
-                                    cx="80"
-                                    cy="80"
-                                    r="70"
-                                    stroke="currentColor"
-                                    strokeWidth="10"
-                                    fill="transparent"
-                                    strokeDasharray={440}
-                                    strokeDashoffset={440 - (440 * (stats?.attendance || 0)) / 100}
-                                    className="text-cyan-500 transition-all duration-1000 ease-out"
-                                    style={{ strokeLinecap: 'round' }}
+                                <circle cx="48" cy="48" r="40" stroke="#1e293b" strokeWidth="6" fill="transparent" />
+                                <circle cx="48" cy="48" r="40" stroke="#06b6d4" strokeWidth="6" fill="transparent"
+                                    strokeDasharray={251}
+                                    strokeDashoffset={251 - (251 * (data?.stats?.attendance_percentage || 0)) / 100}
+                                    className="transition-all duration-1000"
                                 />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-4xl font-bold text-white text-glow">{stats?.attendance}%</span>
-                                <span className="text-xs text-slate-400">Present</span>
+                                <span className="text-xl font-bold">{data?.stats?.attendance_percentage}%</span>
+                                <span className="text-[8px] uppercase tracking-wider text-slate-400">Attendance</span>
                             </div>
                         </div>
                     </motion.div>
 
-                    {/* Quick Stats Grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <motion.div variants={itemVariants} className="glass-card p-4 flex flex-col justify-between h-32 relative overflow-hidden">
-                            <div className="absolute -right-2 -bottom-2 w-16 h-16 bg-indigo-500/20 rounded-full blur-xl"></div>
-                            <BookOpen className="text-indigo-400 mb-2" size={24} />
-                            <div>
-                                <p className="text-xs text-slate-400">Current CGPA</p>
-                                <p className="text-2xl font-bold text-white">{stats?.cgpa}</p>
+                    {/* CGPA */}
+                    <div className="space-y-4">
+                        <motion.div variants={itemVariants} className="glass-card p-4 flex flex-col justify-center h-24 bg-gradient-to-br from-indigo-900/50 to-slate-900/50">
+                            <p className="text-slate-400 text-xs mb-1">CGPA</p>
+                            <div className="flex items-end space-x-2">
+                                <span className="text-3xl font-bold text-indigo-400">{data?.stats?.cgpa}</span>
+                                <span className="text-xs text-indigo-300/50 mb-1">/ 10</span>
                             </div>
                         </motion.div>
-
-                        <motion.div variants={itemVariants} className="glass-card p-4 flex flex-col justify-between h-32 relative overflow-hidden">
-                            <div className="absolute -right-2 -bottom-2 w-16 h-16 bg-pink-500/20 rounded-full blur-xl"></div>
-                            <Calendar className="text-pink-400 mb-2" size={24} />
-                            <div>
-                                <p className="text-xs text-slate-400">Assignments</p>
-                                <p className="text-2xl font-bold text-white">{stats?.assignments_pending} <span className="text-xs font-normal opacity-50">Pending</span></p>
-                            </div>
+                        <motion.div variants={itemVariants} className="glass-card p-4 flex flex-col justify-center h-24">
+                            <p className="text-slate-400 text-xs mb-1">Arrears</p>
+                            <span className={`text-2xl font-bold ${data?.stats?.arrears > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                                {data?.stats?.arrears || 0}
+                            </span>
                         </motion.div>
                     </div>
+                </div>
 
-                    {/* Report Hub / Actions */}
-                    <motion.div variants={itemVariants}>
-                        <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3 px-1">Report Hub</h3>
-                        <div className="space-y-3">
-                            {['Attendance Report', 'Internal Marks', 'Semester Results'].map((item, i) => (
-                                <div key={i} className="glass p-4 rounded-xl flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors group">
-                                    <div className="flex items-center space-x-3">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${i === 0 ? 'bg-indigo-500/20 text-indigo-400' : i === 1 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                                            <BookOpen size={16} />
-                                        </div>
-                                        <span className="text-sm font-medium text-slate-200">{item}</span>
-                                    </div>
-                                    <ChevronRight size={16} className="text-slate-500 group-hover:translate-x-1 transition-transform" />
+                {/* Reports Hub */}
+                <motion.div variants={itemVariants} className="glass-card">
+                    <h3 className="text-sm font-bold text-white mb-4 flex items-center">
+                        <FileText size={16} className="mr-2 text-indigo-400" />
+                        Academic Reports
+                    </h3>
+
+                    <div className="flex space-x-2 mb-4 overflow-x-auto pb-2 scrollbar-none">
+                        {[
+                            { id: 'attendance', label: 'Attendance', icon: Calendar },
+                            { id: 'cat', label: 'CAT Marks', icon: BarChart3 },
+                            { id: 'endsem', label: 'End Semester', icon: GraduationCap }
+                        ].map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => fetchReport(item.id as any)}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap border ${activeReport === item.id
+                                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/20'
+                                    : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800'
+                                    }`}
+                            >
+                                <item.icon size={14} />
+                                <span>{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Dynamic Report Content */}
+                    <div className="min-h-[100px]">
+                        {activeReport && !reportData && (
+                            <div className="flex justify-center py-4"><div className="animate-spin rounded-full h-6 w-6 border-2 border-indigo-500"></div></div>
+                        )}
+
+                        {activeReport && reportData && (
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold text-cyan-400 uppercase">{reportData.title || "Report Details"}</span>
                                 </div>
-                            ))}
-                        </div>
-                    </motion.div>
+                                {/* Render report items mock */}
+                                {reportData.data?.map((subject: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between items-center p-2 rounded bg-white/5 border border-white/5">
+                                        <span className="text-xs text-slate-300">{subject.subject || "Subject " + (idx + 1)}</span>
+                                        <span className="text-xs font-mono font-bold text-white">{subject.marks}/{subject.max}</span>
+                                    </div>
+                                ))}
+                            </motion.div>
+                        )}
 
+                        {!activeReport && (
+                            <div className="text-center py-6 text-slate-500 text-xs">
+                                Select a report type to view details
+                            </div>
+                        )}
+                    </div>
                 </motion.div>
-            </main>
 
-            {/* Floating Bottom Nav */}
-            <div className="fixed bottom-6 left-6 right-6 h-16 glass rounded-2xl flex justify-around items-center px-2 z-50 shadow-2xl border border-white/10">
-                <button className="p-3 rounded-xl bg-white/10 text-white shadow-lg shadow-indigo-500/20"><div className="bg-indigo-500 w-1.5 h-1.5 rounded-full absolute top-3 right-3"></div><Menu size={24} /></button>
+            </motion.main>
+
+            {/* Bottom Nav */}
+            < div className="fixed bottom-6 left-6 right-6 h-16 glass rounded-2xl flex justify-around items-center px-2 z-50 shadow-2xl border border-white/10" >
+                <button onClick={() => router.push('/dashboard')} className="p-3 rounded-xl bg-white/10 text-white shadow-lg shadow-indigo-500/20"><div className="bg-indigo-500 w-1.5 h-1.5 rounded-full absolute top-3 right-3"></div><Menu size={24} /></button>
                 <button className="p-3 rounded-xl text-slate-400 hover:text-white transition-colors" onClick={() => {
                     localStorage.removeItem('token');
                     router.push('/');
                 }}><LogOut size={24} /></button>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

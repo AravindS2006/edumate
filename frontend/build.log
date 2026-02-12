@@ -1,0 +1,46 @@
+
+> frontend@0.1.0 build
+> next build
+
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\aravi\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\aravi\Documents\GitHub\edumate\frontend\package-lock.json
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+Error: Cannot apply unknown utility class `glass`
+    [2m[at onInvalidCandidate (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:21:1511)][0m
+    [2m[at Te (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:16:36326)][0m
+    [2m[at C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:21:355][0m
+    [2m[at Rr (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:3:1718)][0m
+    [2m[at _ (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:3:1377)][0m
+    [2m[at $e (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:21:172)][0m
+    [2m[at un (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:38:294)][0m
+    [2m[at async cn (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\tailwindcss\dist\lib.js:38:631)][0m
+    [2m[at async Xr (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\@tailwindcss\node\dist\index.js:10:3417)][0m
+    [2m[at async I (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\@tailwindcss\postcss\dist\index.js:10:3977)][0m
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./Documents/GitHub/edumate/frontend/src/app/globals.css
+Error evaluating Node.js code
+CssSyntaxError: tailwindcss: C:\Users\aravi\Documents\GitHub\edumate\frontend\src\app\globals.css:1:1: Cannot apply unknown utility class `glass`
+    at Input.error (Documents/GitHub/edumate/frontend/node_modules/postcss/lib/input.js:135:16) [C:\Users\aravi\Documents\GitHub\edumate\frontend\.next\build\chunks\2450d_ab95f710._.js:4651:22]
+    at Root.error (Documents/GitHub/edumate/frontend/node_modules/postcss/lib/node.js:146:32) [C:\Users\aravi\Documents\GitHub\edumate\frontend\.next\build\chunks\2450d_ab95f710._.js:928:38]
+    [at Object.Once (C:\Users\aravi\Documents\GitHub\edumate\frontend\node_modules\@tailwindcss\postcss\dist\index.js:10:6911)]
+    at async LazyResult.runAsync (Documents/GitHub/edumate/frontend/node_modules/postcss/lib/lazy-result.js:293:11) [C:\Users\aravi\Documents\GitHub\edumate\frontend\.next\build\chunks\2450d_ab95f710._.js:6206:21]
+    at async transform (turbopack:///[turbopack-node]/transforms/postcss.ts:70:34) [C:\Users\aravi\Documents\GitHub\edumate\frontend\.next\build\chunks\[root-of-the-server]__1a8e10e3._.js:146:36]
+    at async run (turbopack:///[turbopack-node]/ipc/evaluate.ts:92:23) [C:\Users\aravi\Documents\GitHub\edumate\frontend\.next\build\chunks\[root-of-the-server]__cb304d6c._.js:443:31]
+
+Import trace:
+  Client Component Browser:
+    ./Documents/GitHub/edumate/frontend/src/app/globals.css [Client Component Browser]
+    ./Documents/GitHub/edumate/frontend/src/app/layout.tsx [Server Component]
+
+
+    at async transform (turbopack:///[turbopack-node]/transforms/postcss.ts:70:34) [C:\Users\aravi\Documents\GitHub\edumate\frontend\.next\build\chunks\[root-of-the-server]__1a8e10e3._.js:146:36])
+    at async run (turbopack:///[turbopack-node]/ipc/evaluate.ts:92:23) [C:\Users\aravi\Documents\GitHub\edumate\frontend\.next\build\chunks\[root-of-the-server]__cb304d6c._.js:443:31])
