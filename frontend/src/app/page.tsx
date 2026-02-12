@@ -87,7 +87,7 @@ export default function Home() {
               <User className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors" size={20} />
               <input
                 type="text"
-                placeholder="Registration No."
+                placeholder="Email"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="glass-input w-full pl-10"
