@@ -290,6 +290,10 @@ async def get_exam_status(request: Request, studtblId: str,
                 json_data = resp.json()
                 if "data" in json_data and json_data["data"]:
                     raw = json_data["data"]
+                    # Debug: Print all keys to find arrears info
+                    print(f"[ExamStatus] Keys: {list(raw.keys())}")
+                    print(f"[ExamStatus] Arrear info? 'arrear': {raw.get('arrear')}, 'history': {raw.get('historyOfArrears')}, 'totalArrears': {raw.get('totalArrears')}")
+                    
                     return {
                         "attendance_eligible": raw.get("isAttendanceEligible", False),
                         "fees_eligible": raw.get("isFeesEligible", False),
@@ -298,7 +302,10 @@ async def get_exam_status(request: Request, studtblId: str,
                         "paid_online": raw.get("onlinePaymentFees", 0),
                         "previous_due": raw.get("previousFeeDue", 0),
                         "attendance_pct": raw.get("attendancePercentage", 0),
-                        "od_pct": raw.get("odPercentage", 0)
+                        "od_pct": raw.get("odPercentage", 0),
+                        # Potential new fields
+                        "arrears_current": raw.get("noOfArrears", 0), 
+                        "arrears_history": raw.get("historyOfArrears", 0)
                     }
     except Exception as e:
         print(f"[ExamStatus] Exception: {e}")
@@ -420,45 +427,115 @@ async def get_report_filters(request: Request, reportSubId: int, studtblId: str)
 @app.post("/api/reports/download")
 async def download_report(request: Request):
     """
-    HAR shows: POST Report/ReportsByName
-    Body: {"reportName":"Attendance","semesterId":4,"studtblId":"..."}
-    Returns: PDF binary
+    POST Report/ReportsByName — forwards all body params to upstream.
     """
     body = await request.json()
     upstream_url = f"{BASE_URL}/Report/ReportsByName"
     headers = get_upstream_headers(request)
     
+    # Fix studtblId encoding
+    if "studtblId" in body:
+        body["studtblId"] = fix_id(body["studtblId"])
+    
     report_name = body.get("reportName", "Attendance")
     semester_id = body.get("semesterId", 6)
-    stud_id = fix_id(body.get("studtblId", ""))
     
-    payload = {
-        "reportName": report_name,
-        "semesterId": semester_id,
-        "studtblId": stud_id
+    print(f"[ReportPDF] ===== DOWNLOAD REQUEST =====")
+    print(f"[ReportPDF] Full payload: {json.dumps(body)}")
+    print(f"[ReportPDF] Headers: {json.dumps(dict(request.headers))}")
+    
+    
+    async def try_download(payload: dict) -> Response | None:
+        """Try a single download request, return Response on success or None."""
+        try:
+            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                resp = await client.post(upstream_url, json=payload, headers=headers)
+                ct = resp.headers.get('content-type', '')
+                size = len(resp.content)
+                print(f"[ReportPDF] -> Status={resp.status_code}, CT='{ct}', Size={size}b")
+                
+                # Check for PDF regardless of status code
+                if resp.content[:5] == b'%PDF-' or ('pdf' in ct and size > 200):
+                    print(f"[ReportPDF] SUCCESS: Got PDF ({size} bytes)")
+                    return Response(
+                        content=resp.content,
+                        media_type="application/pdf",
+                        status_code=200,
+                        headers={"Content-Disposition": f"inline; filename={report_name}_sem{semester_id}.pdf"}
+                    )
+                
+                if 'octet-stream' in ct and size > 500:
+                    print(f"[ReportPDF] SUCCESS: Got binary stream ({size} bytes)")
+                    return Response(
+                        content=resp.content,
+                        media_type="application/pdf",
+                        status_code=200,
+                        headers={"Content-Disposition": f"inline; filename={report_name}_sem{semester_id}.pdf"}
+                    )
+                
+                # JSON response - check for base64 PDF or error
+                if 'json' in ct:
+                    try:
+                        json_data = resp.json()
+                        print(f"[ReportPDF] JSON: success={json_data.get('success')}, message={json_data.get('message', '')[:100]}")
+                        
+                        if isinstance(json_data, dict):
+                            # Some APIs embed PDF as base64 in data field
+                            for key in ["data", "pdfData", "reportData", "fileData"]:
+                                val = json_data.get(key)
+                                if val and isinstance(val, str) and not val.startswith("<") and len(val) > 500:
+                                    import base64
+                                    try:
+                                        pdf_bytes = base64.b64decode(val)
+                                        if pdf_bytes[:5] == b'%PDF-' or len(pdf_bytes) > 1000:
+                                            print(f"[ReportPDF] SUCCESS: base64 PDF from '{key}' ({len(pdf_bytes)} bytes)")
+                                            return Response(
+                                                content=pdf_bytes,
+                                                media_type="application/pdf",
+                                                status_code=200,
+                                                headers={"Content-Disposition": f"inline; filename={report_name}_sem{semester_id}.pdf"}
+                                            )
+                                    except Exception:
+                                        pass
+                    except Exception:
+                        pass
+                
+                # Log full error for debugging
+                print(f"[ReportPDF] FULL RESPONSE ({size}b): {resp.text[:1000]}")
+                return None
+                
+        except httpx.TimeoutException:
+            print(f"[ReportPDF] Timeout!")
+            return None
+        except Exception as e:
+            print(f"[ReportPDF] Exception: {type(e).__name__}: {e}")
+            return None
+    
+    # Attempt 1: Use the body as-is from frontend
+    result = await try_download(body)
+    if result:
+        return result
+    
+    # Attempt 2: If reportName was 'EndSem', try 'End Sem' (and vice versa)
+    alt_names = {
+        "University-End Semester": "End Semester",
+        "CAT Performance": "CAT",
     }
+    alt = alt_names.get(report_name)
+    if alt:
+        print(f"[ReportPDF] Retrying with alternate name: '{alt}'")
+        alt_body = {**body, "reportName": alt}
+        result = await try_download(alt_body)
+        if result:
+            return result
     
-    print(f"[ReportPDF] name='{report_name}' sem={semester_id}")
-    
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(upstream_url, json=payload, headers=headers)
-            print(f"[ReportPDF] Status: {resp.status_code}, Content-Type: {resp.headers.get('content-type')}")
-            
-            if resp.status_code == 200:
-                content_type = resp.headers.get("content-type", "application/pdf")
-                return Response(
-                    content=resp.content,
-                    media_type=content_type,
-                    status_code=200,
-                    headers={
-                        "Content-Disposition": f"inline; filename={report_name}_sem{semester_id}.pdf"
-                    }
-                )
-    except Exception as e:
-        print(f"[ReportPDF] Exception: {e}")
-    
-    return Response(status_code=500, content=b"Failed to download report")
+    # All attempts failed
+    print(f"[ReportPDF] ALL ATTEMPTS FAILED for '{report_name}'")
+    return Response(
+        status_code=502,
+        content=json.dumps({"error": f"The {report_name} report could not be generated. The college server returned an error. This may be a temporary issue — please try again later."}).encode(),
+        media_type="application/json"
+    )
 
 # ============================================================
 #  LEGACY REPORT ENDPOINT (kept for compatibility, now JSON-based)
@@ -470,31 +547,149 @@ async def get_report(request: Request, studtblId: str, type: str):
     report_map = {"attendance": 9, "cat": 1, "endsem": 5}
     report_sub_id = report_map.get(type.lower(), 9)
     
+    # Also get the correct report name from the menu
+    report_name_map = {"attendance": "Attendance", "cat": "CAT Performance", "endsem": "University-End Semester"}
+    report_name = report_name_map.get(type.lower(), "Attendance")
+    
     upstream_url = f"{BASE_URL}/Report/GetReportFilterByReportId"
     headers = get_upstream_headers(request)
     
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(upstream_url, params={"ReportSubId": report_sub_id, "studtblId": studtblId}, headers=headers)
+            print(f"[Report] type='{type}' subId={report_sub_id} status={resp.status_code}")
+            
             if resp.status_code == 200:
                 json_data = resp.json()
+                
+                # Log FULL response structure to understand what SSRS needs
+                if "data" in json_data:
+                    data = json_data["data"]
+                    print(f"[Report] Full data keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
+                    # Log non-semester data for debugging
+                    for key, val in data.items():
+                        if key != "semesterData":
+                            print(f"[Report] data.{key} = {json.dumps(val)[:200] if not isinstance(val, str) else val[:200]}")
+                
                 if "data" in json_data and "semesterData" in json_data.get("data", {}):
-                    semesters = json_data["data"]["semesterData"]
+                    data = json_data["data"]
+                    semesters = data["semesterData"]
                     return {
                         "title": f"{type.capitalize()} Report",
                         "type": type,
                         "reportSubId": report_sub_id,
+                        "reportName": report_name,
+                        "filterData": {k: v for k, v in data.items() if k != "semesterData"},
                         "semesters": [
-                            {"id": s.get("semesterId"), "name": s.get("semesterName", ""), "number": s.get("semesterNo", 0)}
+                            {
+                                "id": s.get("semesterId"),
+                                "name": s.get("semesterName", ""),
+                                "number": s.get("semesterNo", 0),
+                                **{k: v for k, v in s.items() if k not in ("semesterId", "semesterName", "semesterNo")}
+                            }
                             for s in semesters
                         ]
                     }
             else:
-                print(f"[Report] Error: {resp.text[:200]}")
+                print(f"[Report] Error: {resp.text[:500]}")
     except Exception as e:
         print(f"[Report] Exception: {e}")
         
     return {"error": "Failed to fetch reports"}
+
+# ============================================================
+#  ATTENDANCE DETAILS (Course, Daily, Overall, Leave)
+# ============================================================
+
+@app.get("/api/attendance/course-detail")
+async def get_attendance_course_detail(request: Request, studtblId: str, 
+                                       academicYearId: int = 14, branchId: int = 2, 
+                                       yearOfStudyId: int = 3, semesterId: int = 6, 
+                                       sectionId: int = 2):
+    studtblId = fix_id(studtblId)
+    upstream_url = f"{BASE_URL}/Student/GetAttendanceCourseDetail"
+    headers = get_upstream_headers(request)
+    params = {
+        "academicYearId": academicYearId, "branchId": branchId, 
+        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
+        "sectionId": sectionId, "studtblId": studtblId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttCourse] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttCourse] Exception: {e}")
+    return {"error": "Failed to fetch course attendance"}
+
+@app.get("/api/attendance/daily-detail")
+async def get_attendance_daily_detail(request: Request, studtblId: str, 
+                                      academicYearId: int = 14, branchId: int = 2, 
+                                      semesterId: int = 6):
+    studtblId = fix_id(studtblId)
+    upstream_url = f"{BASE_URL}/Student/GetStudentDailyAttedanceDetail"
+    headers = get_upstream_headers(request)
+    params = {
+        "studtblId": studtblId, "academicYearId": academicYearId, 
+        "branchId": branchId, "semesterId": semesterId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttDaily] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttDaily] Exception: {e}")
+    return {"error": "Failed to fetch daily attendance"}
+
+@app.get("/api/attendance/overall-detail")
+async def get_attendance_overall_detail(request: Request, studtblId: str, 
+                                        academicYearId: int = 14, branchId: int = 2, 
+                                        yearOfStudyId: int = 3, semesterId: int = 6, 
+                                        sectionId: int = 2):
+    studtblId = fix_id(studtblId)
+    upstream_url = f"{BASE_URL}/Student/GetAttendanceOverAllDetail"
+    headers = get_upstream_headers(request)
+    params = {
+        "academicYearId": academicYearId, "branchId": branchId, 
+        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
+        "sectionId": sectionId, "studtblId": studtblId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttOverall] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttOverall] Exception: {e}")
+    return {"error": "Failed to fetch overall attendance"}
+
+@app.get("/api/attendance/leave-status")
+async def get_leave_status(request: Request, studtblId: str, 
+                           academicYearId: int = 14, branchId: int = 2, 
+                           yearOfStudyId: int = 3, semesterId: int = 6, 
+                           sectionId: int = 2):
+    studtblId = fix_id(studtblId)
+    upstream_url = f"{BASE_URL}/Student/GetLeaveStatusByStudent"
+    headers = get_upstream_headers(request)
+    params = {
+        "academicYearId": academicYearId, "branchId": branchId, 
+        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
+        "sectionId": sectionId, "studtblId": studtblId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttLeave] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttLeave] Exception: {e}")
+    return {"error": "Failed to fetch leave status"}
 
 # ============================================================
 #  INBOX
