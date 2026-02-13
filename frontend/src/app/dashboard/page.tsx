@@ -900,9 +900,15 @@ function ProfileImage({ studtblId, documentId, fallback }: { studtblId: string; 
         (async () => {
             try {
                 const token = localStorage.getItem('token');
+                const institutionId = localStorage.getItem('institutionId') || 'SEC';
                 const res = await fetch(
                     `${API}/api/profile/image?studtblId=${encodeURIComponent(studtblId)}&documentId=${encodeURIComponent(documentId)}`,
-                    { headers: { Authorization: `Bearer ${token}` } },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'X-Institution-Id': institutionId
+                        }
+                    },
                 );
                 if (res.ok && !revoked) {
                     const ct = res.headers.get('content-type') || '';
