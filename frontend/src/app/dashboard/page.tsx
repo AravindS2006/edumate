@@ -598,6 +598,43 @@ export default function Dashboard() {
                     )
                 }
 
+                {/* ── Attendance Calendar Section ── */}
+                <motion.div variants={fadeUp} className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400">
+                            <Calendar size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800">Attendance Tracker</h2>
+                            <p className="text-xs text-slate-500">Daily status & leave record</p>
+                        </div>
+                    </div>
+
+                    <AttendanceCalendar
+                        dailyData={attendanceDaily}
+                        leaveData={leaveData}
+                        loading={attendanceLoading}
+                    />
+                </motion.div>
+
+                {/* ── Course Attendance Gauges ── */}
+                <motion.div variants={fadeUp} className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
+                            <BookOpen size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800">Course-wise Attendance</h2>
+                            <p className="text-xs text-slate-500">Subject performance tracker</p>
+                        </div>
+                    </div>
+
+                    <CourseAttendance
+                        courses={attendanceCourse}
+                        loading={attendanceLoading}
+                    />
+                </motion.div>
+
                 {/* ━━━━━━━━━━ ROW 4: Reports ━━━━━━━━━━ */}
                 <motion.div variants={fadeUp}
                     className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
@@ -718,52 +755,6 @@ export default function Dashboard() {
 
             </motion.main>
 
-            {/* ── Attendance Calendar Section ── */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="mt-3 sm:mt-4 mb-4 sm:mb-6 px-3 sm:px-4 max-w-[1400px] mx-auto"
-            >
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
-                        <Calendar size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-lg sm:text-xl font-bold text-slate-800">Attendance Tracker</h2>
-                        <p className="text-xs text-slate-500">Daily status & leave record</p>
-                    </div>
-                </div>
-
-                <AttendanceCalendar
-                    dailyData={attendanceDaily}
-                    leaveData={leaveData}
-                    loading={attendanceLoading}
-                />
-            </motion.div>
-
-            {/* ── Course Attendance Gauges ── */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="mt-6 sm:mt-8 mb-6 sm:mb-8 px-3 sm:px-4 max-w-[1400px] mx-auto"
-            >
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                        <BookOpen size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-lg sm:text-xl font-bold text-slate-800">Course-wise Attendance</h2>
-                        <p className="text-xs text-slate-500">Subject performance tracker</p>
-                    </div>
-                </div>
-
-                <CourseAttendance
-                    courses={attendanceCourse}
-                    loading={attendanceLoading}
-                />
-            </motion.div>
 
             {/* ═══════════════════════ FOOTER ═══════════════════════ */}
             <footer className="mt-auto border-t border-slate-100/80 bg-white/95">

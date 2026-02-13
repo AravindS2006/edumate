@@ -29,7 +29,30 @@ class SheetsLogger:
             except Exception as e:
                 logger.error(f"Failed to load credentials from GOOGLE_CREDENTIALS env var: {e}")
 
-        # 2. Try Credentials File Path (Local)
+        # 2. Try Vercel GCP Integration Variables
+        if not self.creds:
+            gcp_email = os.environ.get("GCP_SERVICE_ACCOUNT_EMAIL")
+            gcp_key = os.environ.get("GCP_PRIVATE_KEY")
+            
+            if gcp_email and gcp_key:
+                try:
+                    # Handle newlines in private key if they are escaped
+                    if "\\n" in gcp_key:
+                        gcp_key = gcp_key.replace("\\n", "\n")
+                        
+                    creds_dict = {
+                        "type": "service_account",
+                        "client_email": gcp_email,
+                        "private_key": gcp_key,
+                        "project_id": os.environ.get("GCP_PROJECT_ID", ""),
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                    self.creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
+                    logger.info("Loaded credentials from Vercel GCP Integration variables")
+                except Exception as e:
+                    logger.error(f"Failed to create credentials from GCP variables: {e}")
+
+        # 3. Try Credentials File Path (Local)
         if not self.creds:
             possible_paths = [
                 credentials_path,
