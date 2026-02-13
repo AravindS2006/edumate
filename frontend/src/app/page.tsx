@@ -142,7 +142,7 @@ export default function Home() {
               <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input
                 type="text"
-                placeholder="Email / Reg No"
+                placeholder="Email"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="glass-input w-full pl-10"
