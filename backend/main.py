@@ -8,13 +8,13 @@ from crypto_utils import encrypt_data, decrypt_data
 
 app = FastAPI()
 
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "message": "Backend is running"}
+
 # Allow CORS
 origins = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "https://edumate-sairam.vercel.app",
-    "https://edumate-git-main-aravinds2006.vercel.app",
-    "*" # Fallback for now, but explicit is better for credentials
+    "*"
 ]
 
 app.add_middleware(

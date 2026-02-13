@@ -28,7 +28,14 @@ export default function Home() {
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        const text = await res.text().catch(() => "No body");
+        console.error("Failed to parse JSON:", text);
+        throw new Error(`Server returned ${res.status}: ${text.slice(0, 100)}...`);
+      }
 
       if (res.ok) {
         if (data.token) localStorage.setItem('token', data.token);
@@ -44,9 +51,9 @@ export default function Home() {
       } else {
         alert('Login failed: ' + (data.detail || data.error || 'Unknown error'));
       }
-    } catch (err) {
-      console.error(err);
-      alert('Connection failed. Backend might be down.');
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      alert('Connection failed: ' + err.message);
     } finally {
       setLoading(false);
     }
