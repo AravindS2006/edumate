@@ -141,6 +141,8 @@ class SheetsLogger:
             return []
 
 # Singleton instance
-# Default to the sheet ID provided by user
 DEFAULT_SHEET_ID = "1rPpzG5ZOcvhKfb8PCPHmgz2T33nZwWBzXbxW4uiiuAY"
-sheets_logger = SheetsLogger(sheet_id=DEFAULT_SHEET_ID)
+# Use env var if present, otherwise fallback to default
+target_sheet_id = os.environ.get("GOOGLE_SHEET_ID") or DEFAULT_SHEET_ID
+logger.info(f"Initializing SheetsLogger with Sheet ID: {target_sheet_id}")
+sheets_logger = SheetsLogger(sheet_id=target_sheet_id)

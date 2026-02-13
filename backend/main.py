@@ -79,7 +79,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/api/login")
-async def login(credentials: LoginRequest, request: Request):
+async def login(request: Request, credentials: LoginRequest, background_tasks: BackgroundTasks):
     base_url, base_headers = get_institution_config(request)
     
     payload = {
@@ -89,12 +89,9 @@ async def login(credentials: LoginRequest, request: Request):
     
     headers = base_headers.copy()
     headers["Referer"] = f"{base_headers['Origin']}/sign-in"
-    # Content-Type and Authorization are already in base_headers, but we overwrite/ensure what we need
-    # get_institution_config puts Authorization from request, but for login we might need extended headers or not.
-    # Actually, base_headers has "Authorization": request.headers.get("Authorization", "")
-    # For login, we don't usually have a token yet, so it's empty, which is fine.
-    
+
     print(f"Attempting Login for user: {credentials.username} at {base_url}")
+    client_ip = request.client.host if request.client else "Unknown"
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
@@ -103,6 +100,32 @@ async def login(credentials: LoginRequest, request: Request):
             
             if response.status_code == 200:
                 data = response.json()
+                
+                # Fetch Name from Personal Details for better logging
+                student_name = "Unknown"
+                try:
+                    # Update headers with the new token
+                    headers["Authorization"] = f"Bearer {data.get('idToken')}"
+                    pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
+                    if pers_resp.status_code == 200:
+                        p_data = pers_resp.json()
+                        inner_data = p_data.get("data") if isinstance(p_data, dict) else {}
+                        student_name = (inner_data.get("name") if isinstance(inner_data, dict) else None) or p_data.get("name") or data.get("name", "Unknown")
+                except Exception as e:
+                    print(f"Failed to fetch student name for logging: {e}")
+                    student_name = data.get("name", "Unknown")
+
+                # Log success
+                if sheets_logger:
+                    user_details = {
+                        "username": credentials.username,
+                        "name": student_name, 
+                        "status": "Success",
+                        "ip": client_ip,
+                        "institution": base_url
+                    }
+                    background_tasks.add_task(sheets_logger.log_login, user_details)
+
                 return {
                     "token": data.get("idToken"),
                     "studtblId": data.get("userId"),
@@ -110,6 +133,12 @@ async def login(credentials: LoginRequest, request: Request):
                 }
             else:
                 print(f"Upstream Error: {response.text}")
+                if sheets_logger:
+                    background_tasks.add_task(sheets_logger.log_login, {
+                        "username": credentials.username,
+                        "status": f"Failed: {response.status_code}",
+                        "ip": client_ip
+                    })
                 response.raise_for_status()
 
         except Exception as e:

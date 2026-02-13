@@ -106,11 +106,26 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
             if response.status_code == 200:
                 data = response.json()
                 
+                # Fetch Name from Personal Details for better logging
+                student_name = "Unknown"
+                try:
+                    # Update headers with the new token
+                    headers["Authorization"] = f"Bearer {data.get('idToken')}"
+                    pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
+                    if pers_resp.status_code == 200:
+                        p_data = pers_resp.json()
+                        # Some APIs return {"data": {"name": ...}}, others return {"name": ...}
+                        inner_data = p_data.get("data") if isinstance(p_data, dict) else {}
+                        student_name = (inner_data.get("name") if isinstance(inner_data, dict) else None) or p_data.get("name") or data.get("name", "Unknown")
+                except Exception as e:
+                    print(f"Failed to fetch student name for logging: {e}")
+                    student_name = data.get("name", "Unknown")
+
                 # Log success
                 if sheets_logger:
                     user_details = {
                         "username": credentials.username,
-                        "name": data.get("name", "Unknown"), 
+                        "name": student_name, 
                         "status": "Success",
                         "ip": client_ip,
                         "institution": base_url
