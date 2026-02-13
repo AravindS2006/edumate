@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AttendanceCalendar } from '@/components/AttendanceCalendar';
+import Image from 'next/image';
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
 
@@ -379,12 +380,12 @@ export default function Dashboard() {
             <header className="sticky top-0 z-50 border-b border-white/[0.06] backdrop-blur-2xl bg-[#060a14]/80">
                 <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                            <GraduationCap size={18} className="text-white" />
+                        <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-indigo-500/20 overflow-hidden">
+                            <Image src="/assets/SEC-Logo-Login.png" alt="SEC" width={28} height={28} className="object-contain" />
                         </div>
                         <div className="leading-tight">
                             <p className="text-sm font-extrabold tracking-tight text-white">EduMate</p>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase tracking-[0.2em]">Student Portal</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase tracking-[0.2em]">Sairam Student Portal</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -756,13 +757,55 @@ export default function Dashboard() {
 
             {/* ═══════════════════════ FOOTER ═══════════════════════ */}
             <footer className="mt-auto border-t border-white/[0.04] bg-[#040710]/90 backdrop-blur-xl">
-                <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-1.5 text-sm text-slate-400 font-medium">
-                            <span>Built with</span>
-                            <Heart size={13} className="text-red-400 fill-red-400 animate-pulse" />
-                            <span>for Sairam by</span>
-                            <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">SairamATE</span>
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 space-y-5">
+
+                    {/* ── Sairam Branding Grid ── */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        {/* Founder — takes 5 cols on desktop */}
+                        <div className="md:col-span-5 rounded-xl overflow-hidden bg-white p-2 shadow-sm">
+                            <Image
+                                src="/assets/sairam-founder-SphLKZaX.png"
+                                alt="MJF. Ln. Leo Muthu — Founder Chairman, Sairam Institutions"
+                                width={600}
+                                height={100}
+                                className="w-full h-full object-contain"
+                            />
+                        </div>
+                        {/* Right side: SDG + Initiatives stacked — takes 7 cols */}
+                        <div className="md:col-span-7 flex flex-col gap-3">
+                            <div className="rounded-xl overflow-hidden bg-white p-2 shadow-sm flex-1 flex items-center">
+                                <Image
+                                    src="/assets/sairam-logo2-BsAIYXw5.png"
+                                    alt="UN Sustainable Development Goals"
+                                    width={800}
+                                    height={40}
+                                    className="w-full h-auto object-contain"
+                                />
+                            </div>
+                            <div className="rounded-xl overflow-hidden bg-white p-2 shadow-sm flex-1 flex items-center">
+                                <Image
+                                    src="/assets/sairam-logo1-BVt3-ItC.png"
+                                    alt="Sairam SDG Action Program, EOMS, RAISE"
+                                    width={800}
+                                    height={40}
+                                    className="w-full h-auto object-contain"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Credits Row ── */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
+                        <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-sm">
+                                <Image src="/assets/SEC-Logo-Login.png" alt="SEC" width={22} height={22} className="object-contain" />
+                            </div>
+                            <div className="flex items-center gap-1.5 text-sm text-slate-400 font-medium">
+                                <span>Built with</span>
+                                <Heart size={13} className="text-red-400 fill-red-400 animate-pulse" />
+                                <span>for Sairam by</span>
+                                <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">EduMate</span>
+                            </div>
                         </div>
                         <div className="flex items-center gap-4 text-xs text-slate-500">
                             <a href="https://github.com/AravindS2006/edumate" target="_blank" rel="noopener noreferrer"
@@ -778,7 +821,7 @@ export default function Dashboard() {
                             </a>
                         </div>
                     </div>
-                    <p className="text-center text-[10px] text-slate-700 mt-3 font-medium">© {new Date().getFullYear()} EduMate • Sairam Institutions</p>
+                    <p className="text-center text-[10px] text-slate-700 font-medium">© {new Date().getFullYear()} EduMate • Sri Sairam Institutions, Chennai</p>
                 </div>
             </footer>
         </div>

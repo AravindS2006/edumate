@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { User, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Lock, ArrowRight, Loader2, Mail } from 'lucide-react';
+import Image from 'next/image';
 
 export default function Home() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  // const router = useRouter(); // Commented out to avoid unused var warning if not used yet, but it is used.
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -26,16 +26,13 @@ export default function Home() {
 
       const data = await res.json();
 
-      // Robust Auth Handling
       if (res.ok) {
-        // Store everything we get to be safe
         if (data.token) localStorage.setItem('token', data.token);
         if (data.studtblId) localStorage.setItem('studtblId', data.studtblId);
         if (data.access_token) localStorage.setItem('token', data.access_token);
 
-        // Fallback for mock if needed
         if (!data.studtblId && !data.token && !data.access_token) {
-          console.warn("No token/id found in response, strictly mocking?");
+          console.warn("No token/id found in response");
         }
 
         router.push('/dashboard');
@@ -56,6 +53,7 @@ export default function Home() {
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[100px] animate-pulse-slow"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-[50%] left-[30%] w-[30%] h-[30%] bg-violet-600/10 rounded-full blur-[120px]"></div>
       </div>
 
       <motion.div
@@ -65,29 +63,47 @@ export default function Home() {
         className="z-10 w-full max-w-md"
       >
         <div className="glass-card flex flex-col items-center border-t border-white/20">
+
+          {/* ── College Logo ── */}
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="mb-8 relative"
+            className="mb-6"
           >
-            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-              <User size={40} className="text-white" />
+            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-2xl shadow-indigo-500/30 ring-4 ring-white/20 overflow-hidden">
+              <Image
+                src="/assets/SEC-Logo-Login.png"
+                alt="Sri Sairam Institutions"
+                width={80}
+                height={80}
+                className="object-contain"
+                priority
+              />
             </div>
-            <div className="absolute inset-0 rounded-full border border-white/30 animate-ping opacity-20"></div>
           </motion.div>
 
-          <h1 className="text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-100 to-cyan-100 text-glow">
-            Welcome Back
-          </h1>
-          <p className="text-slate-400 mb-8 text-sm">Sign in to your student portal</p>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="text-center mb-6"
+          >
+            <h1 className="text-3xl font-extrabold mb-1 text-transparent bg-clip-text bg-gradient-to-r from-blue-100 to-cyan-100 text-glow">
+              EduMate
+            </h1>
+            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-[0.25em]">
+              Sri Sairam Institutions
+            </p>
+            <p className="text-slate-400 mt-3 text-sm">Sign in to your student portal</p>
+          </motion.div>
 
           <form onSubmit={handleLogin} className="w-full space-y-4">
             <div className="relative group">
-              <User className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors" size={20} />
+              <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors" size={20} />
               <input
                 type="text"
-                placeholder="Email"
+                placeholder="Email / Register Number"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="glass-input w-full pl-10"
@@ -125,10 +141,29 @@ export default function Home() {
             </motion.button>
           </form>
 
-          <div className="mt-8 text-xs text-slate-500 text-center">
-            <p>Protected by AES-256 Encryption</p>
-            <p className="opacity-50">Sairam Institutions</p>
-          </div>
+          {/* ── Sairam Footer Branding ── */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="mt-8 w-full space-y-3"
+          >
+            {/* Sairam SDG/EOMS/RAISE Banner */}
+            <div className="rounded-lg overflow-hidden bg-white p-2">
+              <Image
+                src="/assets/sairam-logo1-BVt3-ItC.png"
+                alt="Sairam Initiatives — SDG Action Program, EOMS, RAISE"
+                width={600}
+                height={50}
+                className="w-full h-auto object-contain"
+              />
+            </div>
+
+            <div className="text-center space-y-1 pt-1">
+              <p className="text-xs text-slate-500 font-semibold">Protected by AES-256 Encryption</p>
+              <p className="text-[10px] text-slate-600">© {new Date().getFullYear()} EduMate • Sairam Institutions</p>
+            </div>
+          </motion.div>
         </div>
       </motion.div>
     </main>
