@@ -296,7 +296,10 @@ export default function Dashboard() {
 
         const fetchAttendance = async () => {
             setAttendanceLoading(true);
-            const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+            const headers = {
+                Authorization: `Bearer ${localStorage.getItem('token')}`,
+                'X-Institution-Id': localStorage.getItem('institutionId') || 'SEC'
+            };
 
             // Use IDs from the academic record
             const params = new URLSearchParams({
@@ -406,7 +409,7 @@ export default function Dashboard() {
 
             {/* ═══════════════════════ BODY ═══════════════════════ */}
             <motion.main initial="hidden" animate="visible" variants={stagger}
-                className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-5 space-y-3 sm:space-y-5">
+                className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-4 space-y-3 sm:space-y-4">
 
                 {/* ── Greeting ── */}
                 <motion.div variants={fadeUp} className="space-y-1">
@@ -416,8 +419,9 @@ export default function Dashboard() {
                     <p className="text-xs sm:text-sm text-slate-500 font-medium">Here&apos;s your academic overview for today.</p>
                 </motion.div>
 
-                {/* ━━━━━━━━━━ ROW 1: Stats Cards (6 items) ━━━━━━━━━━ */}
-                <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+                {/* ━━━━━━━━━━ ROW 1: Stats Cards (4 items) ━━━━━━━━━━ */}
+                <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                    className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-4">
                     <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
                         accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
                         badgeOk={attendPct >= 75} />
@@ -425,18 +429,6 @@ export default function Dashboard() {
                         accent="indigo" badge="/ 10.00" />
                     <StatCard icon={FileText} label="OD Count" value={String(stats?.od_count ?? 0)}
                         accent="violet" badge={`${odPct}%`} />
-                    {/* Temporarily hidden: Arrears sections */}
-                    {/* 
-                    <StatCard icon={AlertCircle} label="Standing Arrears"
-                        value={examStatus ? String(examStatus.arrears_current ?? 0) : '...'}
-                        accent="rose" badge={examStatus?.arrears_current ? 'Critical' : 'All Clear'}
-                        badgeOk={!examStatus?.arrears_current} />
-                    <StatCard icon={HistoryIcon} label="History Arrears"
-                        value={examStatus ? String(examStatus.arrears_history ?? 0) : '...'}
-                        accent="amber" badge="Total" />
-                    */}
-
-                    {/* Fillers to maintain layout if needed, or just let it adjust */}
                     <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
                         accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
                 </motion.div>
@@ -445,7 +437,8 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
 
                     {/* ── Profile Card ── */}
-                    <motion.div variants={fadeUp} className="lg:col-span-4">
+                    <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                        className="lg:col-span-4">
                         <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 h-full">
                             {/* Banner */}
                             <div className="h-20 sm:h-28 relative overflow-hidden">
@@ -492,7 +485,7 @@ export default function Dashboard() {
                     <div className="lg:col-span-8 space-y-3 sm:space-y-4">
 
                         {/* Attendance Ring + Breakdown */}
-                        <motion.div variants={fadeUp}
+                        <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
                             className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
                             {/* Ring */}
                             <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
@@ -525,7 +518,7 @@ export default function Dashboard() {
                         </motion.div>
 
                         {/* Quick Info */}
-                        <motion.div variants={fadeUp}
+                        <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
                             className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
                             <div className="p-4 sm:p-5 space-y-2">
                                 <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -553,7 +546,8 @@ export default function Dashboard() {
                 {/* ━━━━━━━━━━ ROW 3: Academic History + Family ━━━━━━━━━━ */}
                 {
                     (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                            className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
 
                             {acadPct && acadPct.records && acadPct.records.length > 0 && (
                                 <motion.div variants={fadeUp}
@@ -594,9 +588,46 @@ export default function Dashboard() {
                                     </div>
                                 </motion.div>
                             )}
-                        </div>
+                        </motion.div>
                     )
                 }
+
+                {/* ── Attendance Calendar Section ── */}
+                <motion.div variants={fadeUp} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-purple-500/10 rounded-lg text-purple-400">
+                            <Calendar size={20} />
+                        </div>
+                        <div>
+                            <h2 className="text-base font-bold text-slate-800">Attendance Tracker</h2>
+                            <p className="text-[10px] text-slate-500">Daily status & leave record</p>
+                        </div>
+                    </div>
+
+                    <AttendanceCalendar
+                        dailyData={attendanceDaily}
+                        leaveData={leaveData}
+                        loading={attendanceLoading}
+                    />
+                </motion.div>
+
+                {/* ── Course Attendance Gauges ── */}
+                <motion.div variants={fadeUp} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                            <BookOpen size={20} />
+                        </div>
+                        <div>
+                            <h2 className="text-base font-bold text-slate-800">Course-wise Attendance</h2>
+                            <p className="text-[10px] text-slate-500">Subject performance tracker</p>
+                        </div>
+                    </div>
+
+                    <CourseAttendance
+                        courses={attendanceCourse}
+                        loading={attendanceLoading}
+                    />
+                </motion.div>
 
                 {/* ━━━━━━━━━━ ROW 4: Reports ━━━━━━━━━━ */}
                 <motion.div variants={fadeUp}
@@ -718,52 +749,6 @@ export default function Dashboard() {
 
             </motion.main>
 
-            {/* ── Attendance Calendar Section ── */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="mt-3 sm:mt-4 mb-4 sm:mb-6 px-3 sm:px-4 max-w-[1400px] mx-auto"
-            >
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
-                        <Calendar size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-lg sm:text-xl font-bold text-slate-800">Attendance Tracker</h2>
-                        <p className="text-xs text-slate-500">Daily status & leave record</p>
-                    </div>
-                </div>
-
-                <AttendanceCalendar
-                    dailyData={attendanceDaily}
-                    leaveData={leaveData}
-                    loading={attendanceLoading}
-                />
-            </motion.div>
-
-            {/* ── Course Attendance Gauges ── */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="mt-6 sm:mt-8 mb-6 sm:mb-8 px-3 sm:px-4 max-w-[1400px] mx-auto"
-            >
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                        <BookOpen size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-lg sm:text-xl font-bold text-slate-800">Course-wise Attendance</h2>
-                        <p className="text-xs text-slate-500">Subject performance tracker</p>
-                    </div>
-                </div>
-
-                <CourseAttendance
-                    courses={attendanceCourse}
-                    loading={attendanceLoading}
-                />
-            </motion.div>
 
             {/* ═══════════════════════ FOOTER ═══════════════════════ */}
             <footer className="mt-auto border-t border-slate-100/80 bg-white/95">

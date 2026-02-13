@@ -1,14 +1,27 @@
-from fastapi import FastAPI, HTTPException, Request, Response, Query
+from fastapi import FastAPI, HTTPException, Request, Response, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 import json
 import os, sys
-
 # Ensure crypto_utils can be imported from same directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from crypto_utils import encrypt_data, decrypt_data
+# Import sheets_logger - assuming it is in the same directory or available
+# For Vercel, likely need to copy/make available, or fix python path more broadly.
+# But assuming file structure is flat in generic python handler or similar.
+# Actually, api/index.py is usually entry point. We might need to copy sheets_logger.py to api/ or referenced correctly.
+# In Vercel, "api/index.py" executes.
+try:
+    from sheets_logger import sheets_logger
+    print("Imported sheets_logger successfully")
+except Exception as e:
+    print(f"Could not import sheets_logger: {e}")
+    sheets_logger = None
+
+# SECRET KEY for accessing logs
+LOGS_SECRET_KEY = "edumate_admin_secret"
 
 app = FastAPI()
 
@@ -71,7 +84,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/api/login")
-async def login(request: Request, credentials: LoginRequest):
+async def login(request: Request, credentials: LoginRequest, background_tasks: BackgroundTasks):
     base_url, headers = get_institution_config(request)
     
     payload = {
@@ -83,6 +96,7 @@ async def login(request: Request, credentials: LoginRequest):
     headers["Referer"] = headers["Origin"] + "/sign-in"
 
     print(f"Attempting Login for user: {credentials.username}")
+    client_ip = request.client.host if request.client else "Unknown"
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
@@ -91,6 +105,41 @@ async def login(request: Request, credentials: LoginRequest):
             
             if response.status_code == 200:
                 data = response.json()
+                
+                # Fetch Name from Personal Details for better logging
+                student_name = "Unknown"
+                try:
+                    # Update headers with the new token
+                    headers["Authorization"] = f"Bearer {data.get('idToken')}"
+                    pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
+                    if pers_resp.status_code == 200:
+                        p_data = pers_resp.json()
+                        # Some APIs return {"data": {"studentName": ...}}, others return {"studentName": ...}
+                        inner_data = p_data.get("data") if isinstance(p_data, dict) else {}
+                        if isinstance(p_data, list) and len(p_data) > 0:
+                            # Handle case where p_data is a list
+                            inner_data = p_data[0]
+                        
+                        student_name = (inner_data.get("studentName") if isinstance(inner_data, dict) else None) or \
+                                      p_data.get("studentName") or \
+                                      (inner_data.get("name") if isinstance(inner_data, dict) else None) or \
+                                      p_data.get("name") or \
+                                      data.get("name", "Unknown")
+                except Exception as e:
+                    print(f"Failed to fetch student name for logging: {e}")
+                    student_name = data.get("name", "Unknown")
+
+                # Log success
+                if sheets_logger:
+                    user_details = {
+                        "username": credentials.username,
+                        "name": student_name, 
+                        "status": "Success",
+                        "ip": client_ip,
+                        "institution": base_url
+                    }
+                    background_tasks.add_task(sheets_logger.log_login, user_details)
+
                 return {
                     "token": data.get("idToken"),
                     "studtblId": data.get("userId"),
@@ -98,10 +147,22 @@ async def login(request: Request, credentials: LoginRequest):
                 }
             else:
                 print(f"Upstream Error: {response.text}")
+                if sheets_logger:
+                    background_tasks.add_task(sheets_logger.log_login, {
+                        "username": credentials.username,
+                        "status": f"Failed: {response.status_code}",
+                        "ip": client_ip
+                    })
                 response.raise_for_status()
 
         except Exception as e:
             print(f"Upstream login failed: {e}")
+            if sheets_logger:
+                 background_tasks.add_task(sheets_logger.log_login, {
+                    "username": credentials.username,
+                    "status": f"Exception: {str(e)}",
+                    "ip": client_ip
+                })
 
     # Fallback Mock for Dev
     if credentials.username == "test":
@@ -116,6 +177,15 @@ async def login(request: Request, credentials: LoginRequest):
         }
     
     raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@app.get("/api/admin/logs")
+async def get_logs(secret: str = Query(..., description="Secret key to access logs"), limit: int = 50):
+    if secret != LOGS_SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    if sheets_logger:
+        return sheets_logger.get_logs(limit)
+    return {"error": "Logger not initialized"}
 
 def fix_id(studtblId: str) -> str:
     """Ensure + and = are not corrupted by URL encoding."""
@@ -445,41 +515,62 @@ async def get_report_filters(request: Request, reportSubId: int, studtblId: str)
 # ============================================================
 @app.post("/api/reports/download")
 async def download_report(request: Request):
+    """
+    POST Report/ReportsByName — forwards all body params to upstream.
+    """
     body = await request.json()
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Report/ReportsByName"
     
+    # Fix studtblId encoding if present
+    if "studtblId" in body:
+        body["studtblId"] = fix_id(body["studtblId"])
+    
     report_name = body.get("reportName", "Attendance")
     semester_id = body.get("semesterId", 6)
-    stud_id = fix_id(body.get("studtblId", ""))
-    
-    payload = {
-        "reportName": report_name,
-        "semesterId": semester_id,
-        "studtblId": stud_id
-    }
     
     print(f"[ReportPDF] name='{report_name}' sem={semester_id}")
     
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(upstream_url, json=payload, headers=headers)
-            print(f"[ReportPDF] Status: {resp.status_code}, Content-Type: {resp.headers.get('content-type')}")
-            
-            if resp.status_code == 200:
-                content_type = resp.headers.get("content-type", "application/pdf")
-                return Response(
-                    content=resp.content,
-                    media_type=content_type,
-                    status_code=200,
-                    headers={
-                        "Content-Disposition": f"inline; filename={report_name}_sem{semester_id}.pdf"
-                    }
-                )
-    except Exception as e:
-        print(f"[ReportPDF] Exception: {e}")
-    
-    return Response(status_code=500, content=b"Failed to download report")
+    async def try_download(payload: dict) -> Response | None:
+        """Try a single download request, return Response on success or None."""
+        try:
+            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                resp = await client.post(upstream_url, json=payload, headers=headers)
+                ct = resp.headers.get('content-type', '').lower()
+                size = len(resp.content)
+                
+                # Check for PDF regardless of status code
+                if resp.content[:5] == b'%PDF-' or ('pdf' in ct and size > 200):
+                    return Response(
+                        content=resp.content,
+                        media_type="application/pdf",
+                        status_code=200,
+                        headers={"Content-Disposition": f"inline; filename={report_name}_sem{semester_id}.pdf"}
+                    )
+                
+                if 'octet-stream' in ct and size > 500:
+                    return Response(
+                        content=resp.content,
+                        media_type="application/pdf",
+                        status_code=200,
+                        headers={"Content-Disposition": f"inline; filename={report_name}_sem{semester_id}.pdf"}
+                    )
+                return None
+        except Exception as e:
+            print(f"[ReportPDF] Try error: {e}")
+            return None
+
+    # Attempt 1: As-is
+    res = await try_download(body)
+    if res: return res
+
+    # Attempt 2: Alternate names if failed
+    alt_map = {"CAT Performance": "CAT", "University-End Semester": "End Semester"}
+    if report_name in alt_map:
+        res = await try_download({**body, "reportName": alt_map[report_name]})
+        if res: return res
+
+    return Response(status_code=502, content=json.dumps({"error": "Failed to generate report"}).encode())
 
 # ============================================================
 #  LEGACY REPORT ENDPOINT
@@ -521,95 +612,122 @@ async def get_report(request: Request, studtblId: str, type: str):
 # ============================================================
 
 @app.get("/api/attendance/course-detail")
-async def get_attendance_course_detail(request: Request, studtblId: str, 
-                                       academicYearId: int = 14, branchId: int = 2, 
-                                       yearOfStudyId: int = 3, semesterId: int = 6, 
-                                       sectionId: int = 2):
+async def get_attendance_course_detail(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceCourseDetail"
-    params = {
-        "academicYearId": academicYearId, "branchId": branchId, 
-        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
-        "sectionId": sectionId, "studtblId": studtblId
-    }
+    
+    # Forward all incoming query params
+    params = dict(request.query_params)
+    params["studtblId"] = studtblId
+    
+    # Fill SEC defaults if absolutely missing
+    if "academicYearId" not in params: params["academicYearId"] = 14
+    if "branchId" not in params: params["branchId"] = 2
+    if "semesterId" not in params: params["semesterId"] = 6
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
-            print(f"[AttCourse] Status: {resp.status_code}")
             if resp.status_code == 200:
-                return resp.json()
+                json_data = resp.json()
+                
+                # Normalize SIT keys if institution is SIT or structure matches
+                inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
+                items = json_data.get("data") if isinstance(json_data, dict) else json_data
+                
+                if isinstance(items, list):
+                    # Check if it looks like SIT data OR inst_id is SIT
+                    # SIT uses 'subjectCode' or returns raw values without the 'data' key
+                    is_sit = inst_id == "SIT" or (len(items) > 0 and ("subjectCode" in items[0] or "attendancePercentage" in items[0]))
+                    
+                    if is_sit:
+                        normalized_data = []
+                        for item in items:
+                            normalized_data.append({
+                                "courseCode": item.get("subjectCode") or item.get("courseCode"),
+                                "courseName": item.get("subjectName") or item.get("courseName"),
+                                "attendancePercentage": item.get("attendancePercentage") or item.get("percentage") or item.get("p_Percentage") or 0,
+                                "courseId": item.get("courseId") or item.get("id"),
+                                "id": item.get("id") or item.get("courseId")
+                            })
+                        return {"success": True, "data": normalized_data}
+                    else: # If not SIT-like data, but it's a list, wrap it
+                        return {"success": True, "data": items}
+                
+                return json_data
     except Exception as e:
         print(f"[AttCourse] Exception: {e}")
     return {"error": "Failed to fetch course attendance"}
 
 @app.get("/api/attendance/daily-detail")
-async def get_attendance_daily_detail(request: Request, studtblId: str, 
-                                      academicYearId: int = 14, branchId: int = 2, 
-                                      semesterId: int = 6):
+async def get_attendance_daily_detail(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentDailyAttedanceDetail"
-    params = {
-        "studtblId": studtblId, "academicYearId": academicYearId, 
-        "branchId": branchId, "semesterId": semesterId
-    }
+    
+    params = dict(request.query_params)
+    params["studtblId"] = studtblId
+    if "academicYearId" not in params: params["academicYearId"] = 14
+    if "branchId" not in params: params["branchId"] = 2
+    if "semesterId" not in params: params["semesterId"] = 6
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
-            print(f"[AttDaily] Status: {resp.status_code}")
             if resp.status_code == 200:
-                return resp.json()
+                json_data = resp.json()
+                if isinstance(json_data, list):
+                    return {"success": True, "data": json_data}
+                return json_data
     except Exception as e:
         print(f"[AttDaily] Exception: {e}")
     return {"error": "Failed to fetch daily attendance"}
 
 @app.get("/api/attendance/overall-detail")
-async def get_attendance_overall_detail(request: Request, studtblId: str, 
-                                        academicYearId: int = 14, branchId: int = 2, 
-                                        yearOfStudyId: int = 3, semesterId: int = 6, 
-                                        sectionId: int = 2):
+async def get_attendance_overall_detail(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceOverAllDetail"
-    params = {
-        "academicYearId": academicYearId, "branchId": branchId, 
-        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
-        "sectionId": sectionId, "studtblId": studtblId
-    }
+    
+    params = dict(request.query_params)
+    params["studtblId"] = studtblId
+    if "academicYearId" not in params: params["academicYearId"] = 14
+    if "branchId" not in params: params["branchId"] = 2
+    if "semesterId" not in params: params["semesterId"] = 6
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
-            print(f"[AttOverall] Status: {resp.status_code}")
             if resp.status_code == 200:
-                return resp.json()
+                json_data = resp.json()
+                if isinstance(json_data, list):
+                    return {"success": True, "data": json_data}
+                return json_data
     except Exception as e:
         print(f"[AttOverall] Exception: {e}")
     return {"error": "Failed to fetch overall attendance"}
 
 @app.get("/api/attendance/leave-status")
-async def get_leave_status(request: Request, studtblId: str, 
-                           academicYearId: int = 14, branchId: int = 2, 
-                           yearOfStudyId: int = 3, semesterId: int = 6, 
-                           sectionId: int = 2):
+async def get_leave_status(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetLeaveStatusByStudent"
-    params = {
-        "academicYearId": academicYearId, "branchId": branchId, 
-        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
-        "sectionId": sectionId, "studtblId": studtblId
-    }
+    
+    params = dict(request.query_params)
+    params["studtblId"] = studtblId
+    if "academicYearId" not in params: params["academicYearId"] = 14
+    if "branchId" not in params: params["branchId"] = 2
+    if "semesterId" not in params: params["semesterId"] = 6
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
-            print(f"[AttLeave] Status: {resp.status_code}")
             if resp.status_code == 200:
-                return resp.json()
+                json_data = resp.json()
+                if isinstance(json_data, list):
+                    return {"success": True, "data": json_data}
+                return json_data
     except Exception as e:
         print(f"[AttLeave] Exception: {e}")
     return {"error": "Failed to fetch leave status"}

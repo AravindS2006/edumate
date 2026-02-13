@@ -5,3 +5,5 @@ pycryptodome
 python-multipart
 pydantic
 requests
+gspread
+oauth2client
