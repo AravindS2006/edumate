@@ -5,14 +5,18 @@
             "use": "@vercel/next"
         },
         {
-            "src": "backend/main.py",
-            "use": "@vercel/python"
+            "src": "backend/vercel_app.py",
+            "use": "@vercel/python",
+            "config": {
+                "maxDuration": 30,
+                "memory": 1024
+            }
         }
     ],
     "routes": [
         {
             "src": "/api/(.*)",
-            "dest": "/backend/main.py"
+            "dest": "/backend/vercel_app.py"
         },
         {
             "src": "/(.*)",
