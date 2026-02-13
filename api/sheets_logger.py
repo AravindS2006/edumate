@@ -19,6 +19,12 @@ class SheetsLogger:
         
         self.creds = None
         
+        # Debug: Check environment variables availability (do not log actual values)
+        has_env_creds = bool(os.environ.get("GOOGLE_CREDENTIALS"))
+        has_gcp_email = bool(os.environ.get("GCP_SERVICE_ACCOUNT_EMAIL"))
+        has_gcp_key = bool(os.environ.get("GCP_PRIVATE_KEY"))
+        logger.info(f"SheetsLogger Init: Env credentials present? JSON={has_env_creds}, GCP_EMAIL={has_gcp_email}, GCP_KEY={has_gcp_key}")
+        
         # 1. Try Credentials JSON Content from Env Var (Vercel Production)
         google_creds_json = os.environ.get("GOOGLE_CREDENTIALS")
         if google_creds_json:
@@ -51,8 +57,9 @@ class SheetsLogger:
                 except Exception as e:
                     logger.error(f"Failed to create credentials from GCP variables: {e}")
 
-        # 3. Try Credentials File Path (Local Development)
+        # 3. Try Credentials File Path (Local Development)        
         if not self.creds:
+            logger.info("No environment credentials found, checking local files...")
             # Check for generic 'credentials.json' in current directory or backend directory
             possible_paths = [
                 credentials_path,
@@ -85,6 +92,8 @@ class SheetsLogger:
                     logger.warning("GOOGLE_SHEET_ID not provided")
             except Exception as e:
                 logger.error(f"Failed to connect to Google Sheets: {e}")
+        else:
+            logger.warning("SheetsLogger: No credentials could be loaded from any source.")
 
     def log_login(self, user_data):
         if not self.sheet:
