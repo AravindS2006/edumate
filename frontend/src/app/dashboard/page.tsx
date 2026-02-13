@@ -240,7 +240,11 @@ export default function Dashboard() {
         try {
             const res = await fetch(`${API}/api/reports/download`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                    'X-Institution-Id': localStorage.getItem('institutionId') || 'SEC'
+                },
                 body: JSON.stringify(payload),
             });
 

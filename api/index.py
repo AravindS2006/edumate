@@ -517,6 +517,104 @@ async def get_report(request: Request, studtblId: str, type: str):
     return {"error": "Failed to fetch reports"}
 
 # ============================================================
+#  ATTENDANCE DETAILS (Course, Daily, Overall, Leave)
+# ============================================================
+
+@app.get("/api/attendance/course-detail")
+async def get_attendance_course_detail(request: Request, studtblId: str, 
+                                       academicYearId: int = 14, branchId: int = 2, 
+                                       yearOfStudyId: int = 3, semesterId: int = 6, 
+                                       sectionId: int = 2):
+    studtblId = fix_id(studtblId)
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetAttendanceCourseDetail"
+    params = {
+        "academicYearId": academicYearId, "branchId": branchId, 
+        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
+        "sectionId": sectionId, "studtblId": studtblId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttCourse] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttCourse] Exception: {e}")
+    return {"error": "Failed to fetch course attendance"}
+
+@app.get("/api/attendance/daily-detail")
+async def get_attendance_daily_detail(request: Request, studtblId: str, 
+                                      academicYearId: int = 14, branchId: int = 2, 
+                                      semesterId: int = 6):
+    studtblId = fix_id(studtblId)
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentDailyAttedanceDetail"
+    params = {
+        "studtblId": studtblId, "academicYearId": academicYearId, 
+        "branchId": branchId, "semesterId": semesterId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttDaily] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttDaily] Exception: {e}")
+    return {"error": "Failed to fetch daily attendance"}
+
+@app.get("/api/attendance/overall-detail")
+async def get_attendance_overall_detail(request: Request, studtblId: str, 
+                                        academicYearId: int = 14, branchId: int = 2, 
+                                        yearOfStudyId: int = 3, semesterId: int = 6, 
+                                        sectionId: int = 2):
+    studtblId = fix_id(studtblId)
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetAttendanceOverAllDetail"
+    params = {
+        "academicYearId": academicYearId, "branchId": branchId, 
+        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
+        "sectionId": sectionId, "studtblId": studtblId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttOverall] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttOverall] Exception: {e}")
+    return {"error": "Failed to fetch overall attendance"}
+
+@app.get("/api/attendance/leave-status")
+async def get_leave_status(request: Request, studtblId: str, 
+                           academicYearId: int = 14, branchId: int = 2, 
+                           yearOfStudyId: int = 3, semesterId: int = 6, 
+                           sectionId: int = 2):
+    studtblId = fix_id(studtblId)
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetLeaveStatusByStudent"
+    params = {
+        "academicYearId": academicYearId, "branchId": branchId, 
+        "yearOfStudyId": yearOfStudyId, "semesterId": semesterId, 
+        "sectionId": sectionId, "studtblId": studtblId
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttLeave] Status: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        print(f"[AttLeave] Exception: {e}")
+    return {"error": "Failed to fetch leave status"}
+
+# ============================================================
 #  INBOX
 # ============================================================
 @app.get("/api/inbox")
