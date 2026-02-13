@@ -80,7 +80,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
             const data = attendanceMap.get(dateKey);
 
             // Determine Status
-            let statusColor = 'bg-slate-800/50 text-slate-400'; // Default
+            let statusColor = 'bg-slate-100 text-slate-400'; // Default
             let isAbsent = false;
             let isPresent = false;
             let isHoliday = false;
@@ -115,7 +115,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedDate(dateKey)}
                     className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors relative
-            ${isSelected ? 'ring-2 ring-white shadow-lg shadow-purple-500/20 z-10' : ''}
+            ${isSelected ? 'ring-2 ring-indigo-400 shadow-lg shadow-purple-500/20 z-10' : ''}
             ${statusColor}
           `}
                 >
@@ -136,18 +136,18 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Calendar View */}
-            <div className="md:col-span-2 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl">
+            <div className="md:col-span-2 bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-6 shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <CalendarIcon className="text-purple-400" size={20} />
                         {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
                     </h2>
                     <div className="flex gap-2">
-                        <button onClick={prevMonth} className="p-2 hover:bg-white/10 rounded-full text-slate-300 transition-colors">
+                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
                             <ChevronLeft size={20} />
                         </button>
-                        <button onClick={nextMonth} className="p-2 hover:bg-white/10 rounded-full text-slate-300 transition-colors">
+                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
                             <ChevronRight size={20} />
                         </button>
                     </div>
@@ -156,7 +156,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                 {/* Days Header */}
                 <div className="grid grid-cols-7 mb-4 text-center">
                     {DAYS.map(day => (
-                        <div key={day} className="text-xs font-bold text-slate-500 uppercase tracking-wider py-2">
+                        <div key={day} className="text-xs font-bold text-slate-400 uppercase tracking-wider py-2">
                             {day}
                         </div>
                     ))}
@@ -167,7 +167,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                     {loading ? (
                         // Skeleton loader for grid
                         Array.from({ length: 35 }).map((_, i) => (
-                            <div key={i} className="h-10 w-10 rounded-full bg-white/5 animate-pulse" />
+                            <div key={i} className="h-10 w-10 rounded-full bg-slate-50 animate-pulse" />
                         ))
                     ) : (
                         renderCalendarDays()
@@ -184,8 +184,8 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
             </div>
 
             {/* Detail View (Side Panel) */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col h-full rounded-2xl">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <div className="bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-6 shadow-xl flex flex-col h-full rounded-2xl">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <Clock className="text-blue-400" size={18} />
                     Daily Breakdown
                 </h3>
@@ -199,15 +199,15 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                             exit={{ opacity: 0, x: -20 }}
                             className="flex-1"
                         >
-                            <div className="text-sm text-slate-400 mb-4 font-mono border-b border-white/10 pb-2">
+                            <div className="text-sm text-slate-400 mb-4 font-mono border-b border-slate-200 pb-2">
                                 {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             </div>
 
                             {selectedDayData ? (
                                 <div className="space-y-3">
                                     {Object.entries(selectedDayData.attendance).map(([period, status]) => (
-                                        <div key={period} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:border-white/20 transition-colors">
-                                            <span className="text-slate-300 font-medium">Period {period}</span>
+                                        <div key={period} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-300 transition-colors">
+                                            <span className="text-slate-600 font-medium">Period {period}</span>
                                             {status === 'P' || status === 'OD' ? (
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${status === 'OD' ? 'bg-purple-500/20 text-purple-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
                                                     {status === 'OD' ? 'On Duty' : 'Present'}
@@ -223,8 +223,8 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                                     ))}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-48 text-slate-500 gap-2">
-                                    <div className="w-12 h-12 rounded-full bg-slate-800/50 flex items-center justify-center">
+                                <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-2">
+                                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
                                         <CalendarIcon size={24} className="opacity-50" />
                                     </div>
                                     <span>No data for this date</span>
@@ -235,7 +235,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex flex-col items-center justify-center h-64 text-slate-500 text-center"
+                            className="flex flex-col items-center justify-center h-64 text-slate-400 text-center"
                         >
                             <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
                                 <CalendarIcon size={32} className="text-blue-400/50" />

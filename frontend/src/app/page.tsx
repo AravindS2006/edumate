@@ -48,12 +48,12 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background decorations */}
+    <main className="flex min-h-screen flex-col items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+      {/* Subtle background decorations */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[100px] animate-pulse-slow"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-[50%] left-[30%] w-[30%] h-[30%] bg-violet-600/10 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[-20%] left-[-15%] w-[50%] h-[50%] bg-indigo-100/60 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[-20%] right-[-15%] w-[50%] h-[50%] bg-cyan-100/50 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[40%] left-[40%] w-[25%] h-[25%] bg-violet-100/30 rounded-full blur-[100px]"></div>
       </div>
 
       <motion.div
@@ -62,7 +62,7 @@ export default function Home() {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="z-10 w-full max-w-md"
       >
-        <div className="glass-card flex flex-col items-center border-t border-white/20">
+        <div className="glass-card flex flex-col items-center">
 
           {/* ── College Logo ── */}
           <motion.div
@@ -71,7 +71,7 @@ export default function Home() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="mb-6"
           >
-            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-2xl shadow-indigo-500/30 ring-4 ring-white/20 overflow-hidden">
+            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-lg shadow-indigo-100 ring-4 ring-indigo-50 overflow-hidden">
               <Image
                 src="/assets/SAIRAM-ROUND-LOGO.png"
                 alt="Sri Sairam Institutions"
@@ -89,18 +89,18 @@ export default function Home() {
             transition={{ delay: 0.4, duration: 0.5 }}
             className="text-center mb-6"
           >
-            <h1 className="text-3xl font-extrabold mb-1 text-transparent bg-clip-text bg-gradient-to-r from-blue-100 to-cyan-100 text-glow">
+            <h1 className="text-3xl font-extrabold mb-1 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600">
               EduMate
             </h1>
-            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-[0.25em]">
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-[0.25em]">
               Sri Sairam Institutions
             </p>
-            <p className="text-slate-400 mt-3 text-sm">Sign in to your student portal</p>
+            <p className="text-slate-500 mt-3 text-sm">Sign in to your student portal</p>
           </motion.div>
 
           <form onSubmit={handleLogin} className="w-full space-y-4">
             <div className="relative group">
-              <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors" size={20} />
+              <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input
                 type="text"
                 placeholder="Email / Register Number"
@@ -112,7 +112,7 @@ export default function Home() {
             </div>
 
             <div className="relative group">
-              <Lock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors" size={20} />
+              <Lock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input
                 type="password"
                 placeholder="Password"
@@ -148,8 +148,7 @@ export default function Home() {
             transition={{ delay: 0.8, duration: 0.6 }}
             className="mt-8 w-full space-y-3"
           >
-            {/* Sairam SDG/EOMS/RAISE Banner */}
-            <div className="rounded-lg overflow-hidden bg-white p-2">
+            <div className="rounded-lg overflow-hidden bg-white p-2 border border-slate-100">
               <Image
                 src="/assets/sairam-logo1-BVt3-ItC.png"
                 alt="Sairam Initiatives — SDG Action Program, EOMS, RAISE"
@@ -160,8 +159,8 @@ export default function Home() {
             </div>
 
             <div className="text-center space-y-1 pt-1">
-              <p className="text-xs text-slate-500 font-semibold">Protected by AES-256 Encryption</p>
-              <p className="text-[10px] text-slate-600">© {new Date().getFullYear()} EduMate • Sairam Institutions</p>
+              <p className="text-xs text-slate-400 font-semibold">Protected by AES-256 Encryption</p>
+              <p className="text-[10px] text-slate-400">© {new Date().getFullYear()} EduMate • Sairam Institutions</p>
             </div>
           </motion.div>
         </div>
