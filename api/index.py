@@ -12,6 +12,10 @@ from crypto_utils import encrypt_data, decrypt_data
 
 app = FastAPI()
 
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "message": "Backend is running"}
+
 # Allow CORS
 app.add_middleware(
     CORSMiddleware,
@@ -21,8 +25,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Base URL for Sairam Student API
-BASE_URL = "https://student.sairam.edu.in/studapi"
+# Institutions Configuration
+INSTITUTIONS = {
+    "SEC": {
+        "BASE_URL": "https://student.sairam.edu.in/studapi",
+        "Origin": "https://student.sairam.edu.in",
+        "Referer": "https://student.sairam.edu.in/dashboard",
+        "institutionguid": "6EB79EFC-C8B1-47DC-922D-8A7C5E8DAB63"
+    },
+    "SIT": {
+        "BASE_URL": "https://student.sairamit.edu.in/studapi",
+        "Origin": "https://student.sairamit.edu.in",
+        "Referer": "https://student.sairamit.edu.in/dashboard",
+        "institutionguid": "6EB79EFC-C8B1-47DC-922D-8A7C5E8DAB63"  # Same Project Key
+    }
+}
+
+DEFAULT_INSTITUTION = "SEC"
+
+def get_institution_config(request: Request):
+    """
+    Determines the institution from the 'X-Institution-Id' header.
+    Returns (base_url, headers_dict).
+    """
+    inst_id = request.headers.get("X-Institution-Id", DEFAULT_INSTITUTION).upper()
+    config = INSTITUTIONS.get(inst_id, INSTITUTIONS[DEFAULT_INSTITUTION])
+    
+    base_url = config["BASE_URL"]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": config["Referer"],
+        "Origin": config["Origin"],
+        "Content-Type": "application/json",
+        "institutionguid": config["institutionguid"],
+        "Authorization": request.headers.get("Authorization", "")
+    }
+    return base_url, headers
 
 @app.get("/")
 async def root():
@@ -33,25 +71,22 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/api/login")
-async def login(credentials: LoginRequest):
+async def login(request: Request, credentials: LoginRequest):
+    base_url, headers = get_institution_config(request)
+    
     payload = {
         "userName": encrypt_data(credentials.username),
         "password": encrypt_data(credentials.password)
     }
     
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://student.sairam.edu.in/sign-in",
-        "Origin": "https://student.sairam.edu.in",
-        "Content-Type": "application/json",
-        "institutionguid": "6EB79EFC-C8B1-47DC-922D-8A7C5E8DAB63"
-    }
+    # Override for login-specific headers
+    headers["Referer"] = headers["Origin"] + "/sign-in"
 
     print(f"Attempting Login for user: {credentials.username}")
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            response = await client.post(f"{BASE_URL}/User/Login", json=payload, headers=headers)
+            response = await client.post(f"{base_url}/User/Login", json=payload, headers=headers)
             print(f"Upstream Response Status: {response.status_code}")
             
             if response.status_code == 200:
@@ -82,17 +117,6 @@ async def login(credentials: LoginRequest):
     
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
-# --- Helper for Headers ---
-def get_upstream_headers(request: Request):
-    return {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://student.sairam.edu.in/dashboard",
-        "Origin": "https://student.sairam.edu.in",
-        "Content-Type": "application/json",
-        "institutionguid": "6EB79EFC-C8B1-47DC-922D-8A7C5E8DAB63",
-        "Authorization": request.headers.get("Authorization", "")
-    }
-
 def fix_id(studtblId: str) -> str:
     """Ensure + and = are not corrupted by URL encoding."""
     return studtblId.replace(" ", "+")
@@ -105,8 +129,8 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
     studtblId = fix_id(studtblId)
     documentId = fix_id(documentId)
     
-    upstream_url = f"{BASE_URL}/Document/DownloadBlob"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Document/DownloadBlob"
     
     print(f"[Image] studtblId='{studtblId}' documentId='{documentId}'")
     
@@ -135,8 +159,8 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-    upstream_url = f"{BASE_URL}/Dashboard/GetStudentDashboardDetails"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Dashboard/GetStudentDashboardDetails"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -164,7 +188,7 @@ async def get_dashboard_stats(request: Request, studtblId: str):
                     stats = {
                         "attendance_percentage": raw.get("attendancePercentage", 0),
                         "cgpa": raw.get("uG_Cgpa", 0.0),
-                        "arrears": 0,  # Will be filled from exam-status
+                        "arrears": 0,
                         "od_percentage": raw.get("odPercentage", 0),
                         "od_count": raw.get("odCount", 0),
                         "absent_percentage": raw.get("absentPercentage", 0),
@@ -183,14 +207,13 @@ async def get_dashboard_stats(request: Request, studtblId: str):
     return {"error": "Failed to fetch dashboard data"}
 
 # ============================================================
-#  ACADEMIC DETAILS (Fixed! Using correct endpoint)
+#  ACADEMIC DETAILS
 # ============================================================
 @app.get("/api/student/academic")
 async def get_academic_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-    # HAR confirms this endpoint works! Returns batch year, university reg, etc.
-    upstream_url = f"{BASE_URL}/Student/GetStudentAcademicDetails"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentAcademicDetails"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -206,7 +229,7 @@ async def get_academic_details(request: Request, studtblId: str):
                         "semester": raw.get("currentSemsterId", 0),
                         "semester_name": raw.get("semesterName", ""),
                         "semester_type": raw.get("semesterType", ""),
-                        "section": "N/A",  # Not in this endpoint, comes from Dashboard
+                        "section": "N/A",
                         "batch": raw.get("academicBatchYear", ""),
                         "admission_mode": raw.get("admissionMode", ""),
                         "university_reg_no": raw.get("universityRegNo", ""),
@@ -215,7 +238,6 @@ async def get_academic_details(request: Request, studtblId: str):
                         "bus_code": raw.get("busCode", ""),
                         "current_academic_year": raw.get("currentAcademicYear", ""),
                         "programme_id": raw.get("programmeId", 0),
-                        # IDs needed for other endpoints
                         "branch_id": raw.get("branchId", 0),
                         "year_of_study_id": raw.get("yearOfStudyId", 0),
                         "section_id": raw.get("sectionId", 0),
@@ -233,8 +255,8 @@ async def get_academic_details(request: Request, studtblId: str):
 @app.get("/api/student/personal")
 async def get_personal_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-    upstream_url = f"{BASE_URL}/Student/GetStudentPersonalDetails"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentPersonalDetails"
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
@@ -265,7 +287,7 @@ async def get_personal_details(request: Request, studtblId: str):
     return {"error": "Failed to fetch personal details"}
 
 # ============================================================
-#  EXAM STATUS (for arrears / eligibility)
+#  EXAM STATUS
 # ============================================================
 @app.get("/api/student/exam-status")
 async def get_exam_status(request: Request, studtblId: str, 
@@ -273,8 +295,8 @@ async def get_exam_status(request: Request, studtblId: str,
                           semesterId: int = 6, branchId: int = 2,
                           sectionId: int = 2, semesterType: str = "Even"):
     studtblId = fix_id(studtblId)
-    upstream_url = f"{BASE_URL}/HallTicket/GetStudentExamStatus"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetStudentExamStatus"
     params = {
         "studtblId": studtblId,
         "AcademicYearId": academicYearId,
@@ -310,13 +332,13 @@ async def get_exam_status(request: Request, studtblId: str,
     return {"error": "Failed to fetch exam status"}
 
 # ============================================================
-#  ACADEMIC PERCENTAGE (HSC / SSLC)
+#  ACADEMIC PERCENTAGE
 # ============================================================
 @app.get("/api/student/academic-percentage")
 async def get_academic_percentage(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-    upstream_url = f"{BASE_URL}/Student/GetStudentAcademicPercentage"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentAcademicPercentage"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -347,8 +369,8 @@ async def get_academic_percentage(request: Request, studtblId: str):
 @app.get("/api/student/parent")
 async def get_parent_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-    upstream_url = f"{BASE_URL}/Student/GetStudentParentDetails"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentParentDetails"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -374,12 +396,12 @@ async def get_parent_details(request: Request, studtblId: str):
     return {"error": "Failed to fetch parent details"}
 
 # ============================================================
-#  REPORT MENU (available report types)
+#  REPORT MENU
 # ============================================================
 @app.get("/api/reports/menu")
 async def get_report_menu(request: Request):
-    upstream_url = f"{BASE_URL}/Report/GetReportMenuWithSubCategories"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Report/GetReportMenuWithSubCategories"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -392,13 +414,13 @@ async def get_report_menu(request: Request):
     return {"error": "Failed to fetch report menu"}
 
 # ============================================================
-#  REPORT FILTERS (semester list for a report type)
+#  REPORT FILTERS
 # ============================================================
 @app.get("/api/reports/filters")
 async def get_report_filters(request: Request, reportSubId: int, studtblId: str):
     studtblId = fix_id(studtblId)
-    upstream_url = f"{BASE_URL}/Report/GetReportFilterByReportId"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Report/GetReportFilterByReportId"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -419,18 +441,13 @@ async def get_report_filters(request: Request, reportSubId: int, studtblId: str)
     return {"error": "Failed to fetch report filters"}
 
 # ============================================================
-#  REPORT PDF (actual report content - returns PDF binary)
+#  REPORT PDF
 # ============================================================
 @app.post("/api/reports/download")
 async def download_report(request: Request):
-    """
-    HAR shows: POST Report/ReportsByName
-    Body: {"reportName":"Attendance","semesterId":4,"studtblId":"..."}
-    Returns: PDF binary
-    """
     body = await request.json()
-    upstream_url = f"{BASE_URL}/Report/ReportsByName"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Report/ReportsByName"
     
     report_name = body.get("reportName", "Attendance")
     semester_id = body.get("semesterId", 6)
@@ -465,17 +482,16 @@ async def download_report(request: Request):
     return Response(status_code=500, content=b"Failed to download report")
 
 # ============================================================
-#  LEGACY REPORT ENDPOINT (kept for compatibility, now JSON-based)
+#  LEGACY REPORT ENDPOINT
 # ============================================================
 @app.get("/api/reports")
 async def get_report(request: Request, studtblId: str, type: str):
-    """Legacy endpoint - returns filter data for the selected report type."""
     studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
     report_map = {"attendance": 9, "cat": 1, "endsem": 5}
     report_sub_id = report_map.get(type.lower(), 9)
     
-    upstream_url = f"{BASE_URL}/Report/GetReportFilterByReportId"
-    headers = get_upstream_headers(request)
+    upstream_url = f"{base_url}/Report/GetReportFilterByReportId"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -505,8 +521,8 @@ async def get_report(request: Request, studtblId: str, type: str):
 # ============================================================
 @app.get("/api/inbox")
 async def get_inbox(request: Request, receiver_id: str):
-    upstream_url = f"{BASE_URL}/Inbox/GetUnreadCategories"
-    headers = get_upstream_headers(request)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Inbox/GetUnreadCategories"
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(upstream_url, params={"Receiver": receiver_id}, headers=headers)

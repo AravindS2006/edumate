@@ -4,3 +4,4 @@ httpx
 pycryptodome
 python-multipart
 pydantic
+requests
