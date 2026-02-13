@@ -7,7 +7,7 @@ import {
     FileText, LogOut, AlertCircle, Loader2,
     User, TrendingUp, Award, Clock, Users,
     CheckCircle2, XCircle, Mail, Phone, Bus,
-    Download, X, ChevronRight, Sparkles, Shield,
+    Download, X, ChevronRight, Sparkles,
     MapPin, Heart, History as HistoryIcon
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -63,18 +63,6 @@ interface PersonalData {
     age: string;
 }
 
-interface ExamStatus {
-    attendance_eligible: boolean;
-    fees_eligible: boolean;
-    current_status: string;
-    total_fees: number;
-    paid_online: number;
-    previous_due: number;
-    attendance_pct: number;
-    od_pct: number;
-    arrears_current: number;
-    arrears_history: number;
-}
 
 interface AcademicPercentage {
     records: { exam: string; year: string; percentage: string }[];
@@ -122,7 +110,6 @@ export default function Dashboard() {
     const [stats, setStats] = useState<StatsData | null>(null);
     const [academic, setAcademic] = useState<AcademicData | null>(null);
     const [personal, setPersonal] = useState<PersonalData | null>(null);
-    const [examStatus, setExamStatus] = useState<ExamStatus | null>(null);
     const [acadPct, setAcadPct] = useState<AcademicPercentage | null>(null);
     const [parentData, setParentData] = useState<ParentData | null>(null);
 
@@ -166,33 +153,26 @@ export default function Dashboard() {
 
         const load = async () => {
             try {
-                // 1. Critical Data (Stats & Personal Name) -> Unblock UI ASAP
-                const [sRes, pRes] = await Promise.all([
+                // Load ALL data in parallel for fastest possible load
+                const [sRes, pRes, aRes, apRes, prRes] = await Promise.all([
                     fetch(`${API}/api/dashboard/stats?studtblId=${eid}`, { headers }),
                     fetch(`${API}/api/student/personal?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/academic?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/academic-percentage?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/parent?studtblId=${eid}`, { headers }),
                 ]);
 
                 if (sRes.ok) setStats(await sRes.json());
                 if (pRes.ok) setPersonal(await pRes.json());
+                if (aRes.ok) setAcademic(await aRes.json());
+                if (apRes.ok) setAcadPct(await apRes.json());
+                if (prRes.ok) setParentData(await prRes.json());
             } catch (err) {
-                console.error("Critical load error", err);
+                console.error("Load error", err);
                 setError('Network error — could not reach the server.');
             } finally {
-                setLoading(false); // Unblock UI immediately after critical data
+                setLoading(false);
             }
-
-            // 2. Secondary Data -> Load in background
-            fetch(`${API}/api/student/academic?studtblId=${eid}`, { headers })
-                .then(r => { if (r.ok) r.json().then(setAcademic); }).catch(e => console.error(e));
-
-            fetch(`${API}/api/student/exam-status?studtblId=${eid}`, { headers })
-                .then(r => { if (r.ok) r.json().then(setExamStatus); }).catch(e => console.error(e));
-
-            fetch(`${API}/api/student/academic-percentage?studtblId=${eid}`, { headers })
-                .then(r => { if (r.ok) r.json().then(setAcadPct); }).catch(e => console.error(e));
-
-            fetch(`${API}/api/student/parent?studtblId=${eid}`, { headers })
-                .then(r => { if (r.ok) r.json().then(setParentData); }).catch(e => console.error(e));
         };
 
         load();
@@ -261,7 +241,9 @@ export default function Dashboard() {
                 // Success: got PDF binary
                 const blob = await res.blob();
                 if (blob.size > 500) {
-                    const url = URL.createObjectURL(blob);
+                    // Ensure blob has correct PDF MIME type for inline viewing
+                    const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(pdfBlob);
                     setPdfUrl(url);
                 } else {
                     setReportError('Report generated but appears empty. Try a different semester.');
@@ -276,7 +258,8 @@ export default function Dashboard() {
                 // Could still be valid but non-standard content type
                 const blob = await res.blob();
                 if (blob.size > 500) {
-                    const url = URL.createObjectURL(blob);
+                    const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(pdfBlob);
                     setPdfUrl(url);
                 } else {
                     setReportError('The report could not be generated. It may not be available for this semester.');
@@ -402,7 +385,7 @@ export default function Dashboard() {
 
             {/* ═══════════════════════ BODY ═══════════════════════ */}
             <motion.main initial="hidden" animate="visible" variants={stagger}
-                className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8 space-y-8">
+                className="max-w-[1400px] mx-auto px-4 sm:px-8 py-5 space-y-5">
 
                 {/* ── Greeting ── */}
                 <motion.div variants={fadeUp} className="space-y-1">
@@ -438,11 +421,11 @@ export default function Dashboard() {
                 </motion.div>
 
                 {/* ━━━━━━━━━━ ROW 2: Profile + Analytics ━━━━━━━━━━ */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
                     {/* ── Profile Card ── */}
                     <motion.div variants={fadeUp} className="lg:col-span-4">
-                        <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white  shadow-2xl shadow-slate-200/50 h-full">
+                        <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 h-full">
                             {/* Banner */}
                             <div className="h-28 relative overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
@@ -485,11 +468,11 @@ export default function Dashboard() {
                     </motion.div>
 
                     {/* ── Analytics Column ── */}
-                    <div className="lg:col-span-8 space-y-6">
+                    <div className="lg:col-span-8 space-y-4">
 
                         {/* Attendance Ring + Breakdown */}
                         <motion.div variants={fadeUp}
-                            className="rounded-2xl p-6 border border-slate-200/60 bg-white  flex flex-col sm:flex-row items-center gap-6">
+                            className="rounded-2xl p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-5">
                             {/* Ring */}
                             <div className="relative w-32 h-32 flex-shrink-0">
                                 <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
@@ -520,66 +503,40 @@ export default function Dashboard() {
                             </div>
                         </motion.div>
 
-                        {/* Exam Status + Quick Info */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {examStatus && (
-                                <motion.div variants={fadeUp}
-                                    className="rounded-2xl p-5 border border-slate-200/60 bg-white ">
-                                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                        <div className="p-1.5 rounded-lg bg-amber-500/10"><Shield size={14} className="text-amber-400" /></div>
-                                        Exam Eligibility
-                                    </h4>
-                                    <div className="space-y-2">
-                                        <EligibilityRow label="Attendance" ok={examStatus.attendance_eligible} />
-                                        <EligibilityRow label="Fee Payment" ok={examStatus.fees_eligible} />
-                                        {examStatus.current_status && (
-                                            <div className="mt-3 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                                                <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Status</p>
-                                                <p className="text-xs font-semibold text-slate-700 mt-0.5">{examStatus.current_status}</p>
-                                            </div>
-                                        )}
-                                        <div className="grid grid-cols-2 gap-2 mt-2">
-                                            <FeeBox label="Total Fees" value={`₹${examStatus.total_fees?.toLocaleString('en-IN')}`} />
-                                            <FeeBox label="Paid" value={`₹${examStatus.paid_online?.toLocaleString('en-IN')}`} green />
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            <motion.div variants={fadeUp}
-                                className="rounded-2xl border border-slate-200/60 bg-white  overflow-hidden flex flex-col">
-                                <div className="p-5 flex-1 space-y-2">
-                                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                        <div className="p-1.5 rounded-lg bg-indigo-500/10"><Sparkles size={14} className="text-indigo-400" /></div>
-                                        Quick Info
-                                    </h4>
-                                    {stats?.program && <ProfileRow icon={Award} label="Programme" value={stats.program} />}
-                                    {academic?.current_academic_year && <ProfileRow icon={Calendar} label="Academic Year" value={academic.current_academic_year} />}
-                                    {stats?.mentor_name && <ProfileRow icon={User} label="Mentor" value={stats.mentor_name} />}
-                                    {personal?.gender && <ProfileRow icon={User} label="Gender" value={personal.gender} />}
-                                    {personal?.date_of_birth && <ProfileRow icon={Calendar} label="DOB" value={`${personal.date_of_birth} (Age: ${personal.age})`} />}
+                        {/* Quick Info */}
+                        <motion.div variants={fadeUp}
+                            className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden flex flex-col">
+                            <div className="p-5 flex-1 space-y-2">
+                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <div className="p-1.5 rounded-lg bg-indigo-500/10"><Sparkles size={14} className="text-indigo-400" /></div>
+                                    Quick Info
+                                </h4>
+                                {stats?.program && <ProfileRow icon={Award} label="Programme" value={stats.program} />}
+                                {academic?.current_academic_year && <ProfileRow icon={Calendar} label="Academic Year" value={academic.current_academic_year} />}
+                                {stats?.mentor_name && <ProfileRow icon={User} label="Mentor" value={stats.mentor_name} />}
+                                {personal?.gender && <ProfileRow icon={User} label="Gender" value={personal.gender} />}
+                                {personal?.date_of_birth && <ProfileRow icon={Calendar} label="DOB" value={`${personal.date_of_birth} (Age: ${personal.age})`} />}
+                            </div>
+                            <div className="px-5 py-3 border-t border-slate-100/80 flex items-center gap-3 bg-white">
+                                <img src="https://student.sairam.edu.in/assets/sairam-founder-SphLKZaX.png" alt="Founder"
+                                    className="h-10 w-10 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-500 italic">&quot;Success is a journey, not a destination.&quot;</p>
+                                    <p className="text-[9px] text-slate-500">— MJF. Ln. Leo Muthu, Founder Chairman</p>
                                 </div>
-                                <div className="px-5 py-3 border-t border-slate-100/80 flex items-center gap-3 bg-white">
-                                    <img src="https://student.sairam.edu.in/assets/sairam-founder-SphLKZaX.png" alt="Founder"
-                                        className="h-10 w-10 rounded-full object-cover border border-slate-200 flex-shrink-0" />
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-500 italic">&quot;Success is a journey, not a destination.&quot;</p>
-                                        <p className="text-[9px] text-slate-500">— MJF. Ln. Leo Muthu, Founder Chairman</p>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        </div>
+                            </div>
+                        </motion.div>
                     </div>
                 </div>
 
                 {/* ━━━━━━━━━━ ROW 3: Academic History + Family ━━━━━━━━━━ */}
                 {
                     (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                             {acadPct && acadPct.records && acadPct.records.length > 0 && (
                                 <motion.div variants={fadeUp}
-                                    className="rounded-2xl p-5 border border-slate-200/60 bg-white ">
+                                    className="rounded-2xl p-5 border border-slate-200/60 bg-white">
                                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
                                         <div className="p-1.5 rounded-lg bg-cyan-500/10"><BarChart3 size={14} className="text-cyan-400" /></div>
                                         Academic History
@@ -604,7 +561,7 @@ export default function Dashboard() {
 
                             {parentData && (parentData.father_name || parentData.mother_name) && (
                                 <motion.div variants={fadeUp}
-                                    className="rounded-2xl p-5 border border-slate-200/60 bg-white ">
+                                    className="rounded-2xl p-5 border border-slate-200/60 bg-white">
                                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
                                         <div className="p-1.5 rounded-lg bg-pink-500/10"><Users size={14} className="text-pink-400" /></div>
                                         Family Details
@@ -622,7 +579,7 @@ export default function Dashboard() {
 
                 {/* ━━━━━━━━━━ ROW 4: Reports ━━━━━━━━━━ */}
                 <motion.div variants={fadeUp}
-                    className="rounded-2xl border border-slate-200/60 bg-white  overflow-hidden">
+                    className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
 
                     {/* Report Header */}
                     <div className="px-6 pt-5 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
@@ -698,7 +655,7 @@ export default function Dashboard() {
                                         </p>
                                         <div className="flex gap-2">
                                             <a href={pdfUrl} download={`${activeReport}_report.pdf`}
-                                                className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-slate-800 hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-1.5">
+                                                className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-1.5">
                                                 <Download size={13} /> Download
                                             </a>
                                             <button onClick={() => { setPdfUrl(null); setSelectedSemester(null); }}
@@ -707,7 +664,16 @@ export default function Dashboard() {
                                             </button>
                                         </div>
                                     </div>
-                                    <iframe src={pdfUrl} className="w-full h-[500px] rounded-xl border border-slate-200/60 bg-white" title="Report PDF" />
+                                    <object data={pdfUrl} type="application/pdf" className="w-full h-[500px] rounded-xl border border-slate-200/60 bg-white">
+                                        <div className="flex flex-col items-center justify-center h-[500px] gap-4 bg-slate-50 rounded-xl border border-slate-200/60">
+                                            <FileText size={40} className="text-slate-400" />
+                                            <p className="text-sm text-slate-500 font-medium">PDF preview is not available in your browser</p>
+                                            <a href={pdfUrl} download={`${activeReport}_report.pdf`}
+                                                className="px-6 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg transition-all flex items-center gap-2">
+                                                <Download size={16} /> Download Report
+                                            </a>
+                                        </div>
+                                    </object>
                                 </motion.div>
                             )}
 
@@ -736,9 +702,9 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="mt-8 mb-12 px-4 max-w-[1400px] mx-auto"
+                className="mt-4 mb-6 px-4 max-w-[1400px] mx-auto"
             >
-                <div className="flex items-center gap-3 mb-6">
+                <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
                         <Calendar size={24} />
                     </div>
@@ -756,8 +722,8 @@ export default function Dashboard() {
             </motion.div>
 
             {/* ═══════════════════════ FOOTER ═══════════════════════ */}
-            <footer className="mt-auto border-t border-slate-100/80 bg-white/95 ">
-                <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 space-y-5">
+            <footer className="mt-auto border-t border-slate-100/80 bg-white/95">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-4 space-y-4">
 
                     {/* ── Sairam Branding Grid ── */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -905,25 +871,8 @@ function BarStat({ label, pct, color }: { label: string; pct: number; color: str
     );
 }
 
-function EligibilityRow({ label, ok }: { label: string; ok: boolean }) {
-    return (
-        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-xs text-slate-500 font-medium">{label}</span>
-            {ok
-                ? <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400"><CheckCircle2 size={14} /> Eligible</span>
-                : <span className="flex items-center gap-1 text-[10px] font-bold text-rose-400"><XCircle size={14} /> Not Eligible</span>}
-        </div>
-    );
-}
 
-function FeeBox({ label, value, green }: { label: string; value: string; green?: boolean }) {
-    return (
-        <div className="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100 text-center">
-            <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">{label}</p>
-            <p className={`text-sm font-black mt-0.5 ${green ? 'text-emerald-400' : 'text-slate-700'}`}>{value}</p>
-        </div>
-    );
-}
+
 
 function FamilyCard({ label, name, occupation, mobile }: { label: string; name: string; occupation: string; mobile: string }) {
     return (
