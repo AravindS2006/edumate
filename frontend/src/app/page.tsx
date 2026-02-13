@@ -73,7 +73,7 @@ export default function Home() {
           >
             <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-2xl shadow-indigo-500/30 ring-4 ring-white/20 overflow-hidden">
               <Image
-                src="/assets/SEC-Logo-Login.png"
+                src="/assets/SAIRAM-ROUND-LOGO.png"
                 alt="Sri Sairam Institutions"
                 width={80}
                 height={80}

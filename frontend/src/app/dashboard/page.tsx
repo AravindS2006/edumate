@@ -381,7 +381,7 @@ export default function Dashboard() {
                 <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-indigo-500/20 overflow-hidden">
-                            <Image src="/assets/SEC-Logo-Login.png" alt="SEC" width={28} height={28} className="object-contain" />
+                            <Image src="/assets/SAIRAM-ROUND-LOGO.png" alt="Sairam" width={28} height={28} className="object-contain" />
                         </div>
                         <div className="leading-tight">
                             <p className="text-sm font-extrabold tracking-tight text-white">EduMate</p>
@@ -798,7 +798,7 @@ export default function Dashboard() {
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
                         <div className="flex items-center gap-3">
                             <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-sm">
-                                <Image src="/assets/SEC-Logo-Login.png" alt="SEC" width={22} height={22} className="object-contain" />
+                                <Image src="/assets/SAIRAM-ROUND-LOGO.png" alt="Sairam" width={22} height={22} className="object-contain" />
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-slate-400 font-medium">
                                 <span>Built with</span>
