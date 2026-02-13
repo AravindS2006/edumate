@@ -114,9 +114,17 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                     pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
                     if pers_resp.status_code == 200:
                         p_data = pers_resp.json()
-                        # Some APIs return {"data": {"name": ...}}, others return {"name": ...}
+                        # Some APIs return {"data": {"studentName": ...}}, others return {"studentName": ...}
                         inner_data = p_data.get("data") if isinstance(p_data, dict) else {}
-                        student_name = (inner_data.get("name") if isinstance(inner_data, dict) else None) or p_data.get("name") or data.get("name", "Unknown")
+                        if isinstance(p_data, list) and len(p_data) > 0:
+                            # Handle case where p_data is a list
+                            inner_data = p_data[0]
+                        
+                        student_name = (inner_data.get("studentName") if isinstance(inner_data, dict) else None) or \
+                                      p_data.get("studentName") or \
+                                      (inner_data.get("name") if isinstance(inner_data, dict) else None) or \
+                                      p_data.get("name") or \
+                                      data.get("name", "Unknown")
                 except Exception as e:
                     print(f"Failed to fetch student name for logging: {e}")
                     student_name = data.get("name", "Unknown")
