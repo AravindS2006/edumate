@@ -49,6 +49,7 @@ class SheetsLogger:
                         "type": "service_account",
                         "client_email": gcp_email,
                         "private_key": gcp_key,
+                        "private_key_id": os.environ.get("GCP_PRIVATE_KEY_ID", "dummy_key_id"),
                         "project_id": os.environ.get("GCP_PROJECT_ID", ""),
                         "token_uri": "https://oauth2.googleapis.com/token",
                     }
