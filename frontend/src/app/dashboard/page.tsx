@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AttendanceCalendar } from '@/components/AttendanceCalendar';
+import { CourseAttendance } from '@/components/CourseAttendance';
 import Image from 'next/image';
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -128,6 +129,7 @@ export default function Dashboard() {
 
     // Attendance State
     const [attendanceDaily, setAttendanceDaily] = useState<any[]>([]);
+    const [attendanceCourse, setAttendanceCourse] = useState<any[]>([]);
     const [leaveData, setLeaveData] = useState<any[]>([]);
     const [attendanceLoading, setAttendanceLoading] = useState(false);
 
@@ -308,9 +310,10 @@ export default function Dashboard() {
 
             try {
                 // Parallel fetch
-                const [dailyRes, leaveRes] = await Promise.all([
+                const [dailyRes, leaveRes, courseRes] = await Promise.all([
                     fetch(`${API}/api/attendance/daily-detail?${params}`, { headers }),
-                    fetch(`${API}/api/attendance/leave-status?${params}`, { headers })
+                    fetch(`${API}/api/attendance/leave-status?${params}`, { headers }),
+                    fetch(`${API}/api/attendance/course-detail?${params}`, { headers })
                 ]);
 
                 if (dailyRes.ok) {
@@ -321,6 +324,11 @@ export default function Dashboard() {
                 if (leaveRes.ok) {
                     const leaveJson = await leaveRes.json();
                     if (leaveJson.data) setLeaveData(leaveJson.data);
+                }
+
+                if (courseRes.ok) {
+                    const courseJson = await courseRes.json();
+                    if (courseJson.data) setAttendanceCourse(courseJson.data);
                 }
             } catch (err) {
                 console.error("Failed to load attendance", err);
@@ -730,6 +738,29 @@ export default function Dashboard() {
                 <AttendanceCalendar
                     dailyData={attendanceDaily}
                     leaveData={leaveData}
+                    loading={attendanceLoading}
+                />
+            </motion.div>
+
+            {/* ── Course Attendance Gauges ── */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="mt-6 sm:mt-8 mb-6 sm:mb-8 px-3 sm:px-4 max-w-[1400px] mx-auto"
+            >
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                        <BookOpen size={24} />
+                    </div>
+                    <div>
+                        <h2 className="text-lg sm:text-xl font-bold text-slate-800">Course-wise Attendance</h2>
+                        <p className="text-xs text-slate-500">Subject performance tracker</p>
+                    </div>
+                </div>
+
+                <CourseAttendance
+                    courses={attendanceCourse}
                     loading={attendanceLoading}
                 />
             </motion.div>

@@ -31,8 +31,12 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
     // Helper to format date as YYYY-MM-DD
+    // Helper to format date as YYYY-MM-DD
     const formatDateKey = (date: Date) => {
-        return date.toISOString().split('T')[0];
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     };
 
     // Process data into a map for easy lookup
@@ -87,16 +91,25 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
 
             if (data) {
                 const statuses = Object.values(data.attendance);
-                const presentCount = statuses.filter(s => s === 'P' || s === 'OD').length;
-                const absentCount = statuses.filter(s => s === 'A').length;
+                // Normalize status check
+                const isStatusPresent = (s: string) => ['P', 'Present'].some(v => s && s.toUpperCase().startsWith(v.toUpperCase()));
+                const isStatusAbsent = (s: string) => ['A', 'Ab', 'Absent', 'L', 'Leave'].some(v => s && s.toUpperCase().startsWith(v.toUpperCase()));
+                const isStatusOD = (s: string) => ['OD', 'On Duty'].some(v => s && s.toUpperCase().startsWith(v.toUpperCase()));
 
-                if (absentCount > 0 && presentCount > 0) {
+                const presentCount = statuses.filter(s => isStatusPresent(s)).length;
+                const absentCount = statuses.filter(s => isStatusAbsent(s)).length;
+                const odCount = statuses.filter(s => isStatusOD(s)).length;
+
+                if (odCount > 0 && absentCount === 0 && presentCount === 0) {
+                    statusColor = 'bg-purple-500/20 text-purple-400 border border-purple-500/30'; // Full OD
+                    isPresent = true; // Still counts as present for dots
+                } else if (absentCount > 0 && (presentCount > 0 || odCount > 0)) {
                     statusColor = 'bg-orange-500/20 text-orange-400 border border-orange-500/30'; // Partial
                     isAbsent = true;
                 } else if (absentCount > 0) {
                     statusColor = 'bg-red-500/20 text-red-400 border border-red-500/30'; // Full Absent
                     isAbsent = true;
-                } else if (presentCount > 0) {
+                } else if (presentCount > 0 || odCount > 0) {
                     statusColor = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'; // Full Present
                     isPresent = true;
                 } else {
@@ -175,8 +188,9 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                 </div>
 
                 {/* Legend */}
-                <div className="mt-8 flex gap-4 justify-center text-xs text-slate-400">
+                <div className="mt-8 flex flex-wrap gap-4 justify-center text-xs text-slate-400">
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /> Present</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-500" /> On Duty</div>
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500" /> Absent</div>
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500" /> Partial</div>
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400" /> Holiday</div>
@@ -208,16 +222,18 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                                     {Object.entries(selectedDayData.attendance).map(([period, status]) => (
                                         <div key={period} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-300 transition-colors">
                                             <span className="text-slate-600 font-medium">Period {period}</span>
-                                            {status === 'P' || status === 'OD' ? (
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${status === 'OD' ? 'bg-purple-500/20 text-purple-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                                                    {status === 'OD' ? 'On Duty' : 'Present'}
+                                            {['P', 'Present', 'OD', 'On Duty'].some(v => status && status.toUpperCase().startsWith(v.toUpperCase())) ? (
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${status.toUpperCase().includes('OD') ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                    {status.toUpperCase().includes('OD')
+                                                        ? (status.includes('-') ? status.split('-')[1].trim() : 'On Duty')
+                                                        : 'Present'}
                                                 </span>
-                                            ) : status === 'A' ? (
-                                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300">
+                                            ) : ['A', 'Ab', 'Absent', 'L', 'Leave'].some(v => status && status.toUpperCase().startsWith(v.toUpperCase())) ? (
+                                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
                                                     Absent
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-600 text-xs italic">No Class</span>
+                                                <span className="text-slate-600 text-xs italic">{status || 'No Data'}</span>
                                             )}
                                         </div>
                                     ))}
@@ -232,16 +248,45 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                             )}
                         </motion.div>
                     ) : (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex flex-col items-center justify-center h-64 text-slate-400 text-center"
-                        >
-                            <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
-                                <CalendarIcon size={32} className="text-blue-400/50" />
-                            </div>
-                            <p>Select a date to view <br /> period-wise details</p>
-                        </motion.div>
+                        leaveData && leaveData.length > 0 ? (
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                className="flex-1 overflow-y-auto pr-1 custom-scrollbar"
+                            >
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <AlertCircle size={14} /> Leave History
+                                </h4>
+                                <div className="space-y-3">
+                                    {leaveData.map((leave, i) => (
+                                        <div key={i} className="p-3 rounded-xl bg-orange-50/50 border border-orange-100/60 hover:border-orange-200 transition-colors">
+                                            <div className="flex justify-between items-start mb-1.5">
+                                                <span className="text-sm font-bold text-slate-700 line-clamp-1">{leave.reasonName}</span>
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${leave.leaveStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600' :
+                                                    leave.leaveStatus === 'Rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                                                    }`}>
+                                                    {leave.leaveStatus}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                <CalendarIcon size={12} />
+                                                {new Date(leave.fromDate).toLocaleDateString()} - {new Date(leave.toDate).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="flex flex-col items-center justify-center h-64 text-slate-400 text-center"
+                            >
+                                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+                                    <CalendarIcon size={32} className="text-blue-400/50" />
+                                </div>
+                                <p>Select a date to view <br /> period-wise details</p>
+                            </motion.div>
+                        )
                     )}
                 </AnimatePresence>
             </div>
