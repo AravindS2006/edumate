@@ -84,20 +84,33 @@ class SheetsLogger:
         self.sheet_id = sheet_id or os.environ.get("GOOGLE_SHEET_ID")
         self.sheet = None
 
-        if self.creds:
-            try:
-                self.client = gspread.authorize(self.creds)
-                if self.sheet_id:
-                    self.sheet = self.client.open_by_key(self.sheet_id).sheet1
-                    logger.info("Successfully connected to Google Sheet")
-                else:
-                    logger.warning("GOOGLE_SHEET_ID not provided")
-            except Exception as e:
-                logger.error(f"Failed to connect to Google Sheets: {repr(e)}")
-        else:
-            logger.warning("SheetsLogger: No credentials could be loaded from any source.")
+    def connect(self):
+        """Attempts to connect to Google Sheets if not already connected."""
+        if self.sheet:
+            return True
+
+        if not self.creds:
+            logger.warning("Cannot connect: No credentials loaded.")
+            return False
+
+        try:
+            self.client = gspread.authorize(self.creds)
+            if self.sheet_id:
+                self.sheet = self.client.open_by_key(self.sheet_id).sheet1
+                logger.info("Successfully connected to Google Sheet (Lazy Load)")
+                return True
+            else:
+                logger.warning("GOOGLE_SHEET_ID not provided")
+                return False
+        except Exception as e:
+            logger.error(f"Lazy Connection Failed: {repr(e)}")
+            return False
 
     def log_login(self, user_data):
+        # Try to connect if not connected
+        if not self.sheet:
+            self.connect()
+
         if not self.sheet:
             state = f"Creds={bool(self.creds)}, Client={bool(self.client)}, SheetID={self.sheet_id}, SheetObj={bool(self.sheet)}"
             logger.warning(f"Google Sheet not configured. Skipping log. State: {state}")
