@@ -148,7 +148,11 @@ export default function Dashboard() {
 
         if (!token) { router.push('/'); return; }
 
-        const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+        const institutionId = localStorage.getItem('institutionId') || 'SEC';
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${token}`,
+            'X-Institution-Id': institutionId
+        };
         const eid = encodeURIComponent(id);
 
         const load = async () => {
@@ -191,7 +195,12 @@ export default function Dashboard() {
         try {
             const res = await fetch(
                 `${API}/api/reports?type=${type}&studtblId=${encodeURIComponent(studtblId)}`,
-                { headers: { Authorization: `Bearer ${token}` } },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'X-Institution-Id': localStorage.getItem('institutionId') || 'SEC'
+                    }
+                },
             );
             const json = res.ok ? await res.json() : null;
             if (json && json.semesters && json.semesters.length > 0) {

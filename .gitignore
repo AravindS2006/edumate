@@ -31,3 +31,7 @@ Thumbs.db
 # ─── Dev / Debug scripts ───
 verify_backend.py
 setup_backend.bat
+extracted_context.txt
+extracted_guid.txt
+temp_sit_main.js
+temp_sit_main_v2.js

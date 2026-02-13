@@ -9,6 +9,7 @@ import Image from 'next/image';
 export default function Home() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [institution, setInstitution] = useState('SEC');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -20,7 +21,10 @@ export default function Home() {
       const apiBase = process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : '';
       const res = await fetch(`${apiBase}/api/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Institution-Id': institution
+        },
         body: JSON.stringify({ username, password }),
       });
 
@@ -30,6 +34,7 @@ export default function Home() {
         if (data.token) localStorage.setItem('token', data.token);
         if (data.studtblId) localStorage.setItem('studtblId', data.studtblId);
         if (data.access_token) localStorage.setItem('token', data.access_token);
+        localStorage.setItem('institutionId', institution); // Store selected institution
 
         if (!data.studtblId && !data.token && !data.access_token) {
           console.warn("No token/id found in response");
@@ -99,11 +104,38 @@ export default function Home() {
           </motion.div>
 
           <form onSubmit={handleLogin} className="w-full space-y-4">
+
+            {/* Institution Selector */}
+            <div className="relative group">
+              <div className="flex gap-2 p-1 bg-slate-100/50 rounded-lg border border-slate-200/50">
+                <button
+                  type="button"
+                  onClick={() => setInstitution('SEC')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all ${institution === 'SEC'
+                    ? 'bg-white text-indigo-600 shadow-sm border border-slate-100'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                >
+                  SEC
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInstitution('SIT')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all ${institution === 'SIT'
+                    ? 'bg-white text-indigo-600 shadow-sm border border-slate-100'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                >
+                  SIT
+                </button>
+              </div>
+            </div>
+
             <div className="relative group">
               <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input
                 type="text"
-                placeholder="Email"
+                placeholder="Email / Reg No"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="glass-input w-full pl-10"
