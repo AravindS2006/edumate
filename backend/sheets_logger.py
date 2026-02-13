@@ -49,6 +49,7 @@ class SheetsLogger:
                     creds_dict = {
                         "type": "service_account",
                         "client_email": gcp_email,
+                        "client_id": os.environ.get("GCP_CLIENT_ID", "dummy_client_id"),
                         "private_key": gcp_key,
                         "private_key_id": os.environ.get("GCP_PRIVATE_KEY_ID", "dummy_key_id"),
                         "project_id": os.environ.get("GCP_PROJECT_ID", ""),
