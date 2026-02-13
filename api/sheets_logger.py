@@ -98,7 +98,8 @@ class SheetsLogger:
 
     def log_login(self, user_data):
         if not self.sheet:
-            logger.warning("Google Sheet not configured. Skipping log.")
+            state = f"Creds={bool(self.creds)}, Client={bool(self.client)}, SheetID={self.sheet_id}, SheetObj={bool(self.sheet)}"
+            logger.warning(f"Google Sheet not configured. Skipping log. State: {state}")
             return
 
         try:
