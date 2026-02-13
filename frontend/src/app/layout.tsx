@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Sairam Student Dashboard",
-  description: "Ultra-Neo Realistic Student Portal",
+  title: "EduMate — Sairam Student Portal",
+  description: "A premium student dashboard for Sri Sairam Engineering College. View attendance, academic reports, and more.",
   manifest: "/manifest.json",
 };
 
