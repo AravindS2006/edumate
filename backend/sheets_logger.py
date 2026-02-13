@@ -56,9 +56,9 @@ class SheetsLogger:
                         "token_uri": "https://oauth2.googleapis.com/token",
                     }
                     self.creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
-                    logger.info("Loaded credentials from Vercel GCP Integration variables")
+                    logger.info(f"Loaded credentials for Service Account: {gcp_email}")
                 except Exception as e:
-                    logger.error(f"Failed to create credentials from GCP variables: {e}")
+                    logger.error(f"Failed to create credentials from GCP variables: {repr(e)}")
 
         # 3. Try Credentials File Path (Local)
         if not self.creds:
@@ -94,7 +94,7 @@ class SheetsLogger:
                 else:
                     logger.warning("GOOGLE_SHEET_ID not provided")
             except Exception as e:
-                logger.error(f"Failed to connect to Google Sheets: {e}")
+                logger.error(f"Failed to connect to Google Sheets: {repr(e)}")
         else:
             logger.warning("SheetsLogger: No credentials could be loaded from any source.")
 
