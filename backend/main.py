@@ -9,9 +9,17 @@ from crypto_utils import encrypt_data, decrypt_data
 app = FastAPI()
 
 # Allow CORS
+origins = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "https://edumate-sairam.vercel.app",
+    "https://edumate-git-main-aravinds2006.vercel.app",
+    "*" # Fallback for now, but explicit is better for credentials
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
