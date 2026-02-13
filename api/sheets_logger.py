@@ -6,7 +6,6 @@ import json
 import logging
 
 # Configure basic logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SheetsLogger:
@@ -20,7 +19,7 @@ class SheetsLogger:
         
         self.creds = None
         
-        # 1. Try Credentials JSON Content from Env Var (Vercel)
+        # 1. Try Credentials JSON Content from Env Var (Vercel Production)
         google_creds_json = os.environ.get("GOOGLE_CREDENTIALS")
         if google_creds_json:
             try:
@@ -29,15 +28,15 @@ class SheetsLogger:
             except Exception as e:
                 logger.error(f"Failed to load credentials from GOOGLE_CREDENTIALS env var: {e}")
 
-        # 2. Try Credentials File Path (Local)
+        # 2. Try Credentials File Path (Local Development)
         if not self.creds:
+            # Check for generic 'credentials.json' in current directory or backend directory
             possible_paths = [
                 credentials_path,
                 "credentials.json",
-                "gen-lang-client-0354311340-378911baa079.json",
+                "../backend/credentials.json",
                 os.path.join(os.path.dirname(__file__), "credentials.json"),
-                os.path.join(os.path.dirname(__file__), "..", "credentials.json"),
-                os.path.join(os.path.dirname(__file__), "..", "gen-lang-client-0354311340-378911baa079.json")
+                os.path.join(os.path.dirname(__file__), "..", "backend", "credentials.json")
             ]
             
             for path in possible_paths:
@@ -80,7 +79,6 @@ class SheetsLogger:
                 user_data.get("institution", "Unknown")
             ]
             self.sheet.append_row(row)
-            logger.info(f"Logged login for {user_data.get('username')}")
         except Exception as e:
             logger.error(f"Failed to log to Google Sheet: {e}")
 
@@ -95,5 +93,6 @@ class SheetsLogger:
             return []
 
 # Singleton instance
+# Default to the sheet ID provided by user
 DEFAULT_SHEET_ID = "1rPpzG5ZOcvhKfb8PCPHmgz2T33nZwWBzXbxW4uiiuAY"
 sheets_logger = SheetsLogger(sheet_id=DEFAULT_SHEET_ID)

@@ -17,15 +17,8 @@ try:
     from sheets_logger import sheets_logger
     print("Imported sheets_logger successfully")
 except ImportError:
-    # Try importing from backend if running locally in unusual structure? 
-    # Or simplified inline fallback?
-    # Let's try to append parent dir
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
-    try:
-        from backend.sheets_logger import sheets_logger
-    except ImportError:
-        print("Could not import sheets_logger")
-        sheets_logger = None
+    print("Could not import sheets_logger")
+    sheets_logger = None
 
 # SECRET KEY for accessing logs
 LOGS_SECRET_KEY = "edumate_admin_secret"
