@@ -770,7 +770,7 @@ export default function Dashboard() {
                                 <span>Built with</span>
                                 <Heart size={13} className="text-red-400 fill-red-400 animate-pulse" />
                                 <span>for Sairam by</span>
-                                <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">EduMate</span>
+                                <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Sairamite</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-4 text-xs text-slate-500">
