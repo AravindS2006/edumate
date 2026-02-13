@@ -3,3 +3,5 @@ httpx
 pycryptodome
 python-multipart
 pydantic
+gspread
+oauth2client

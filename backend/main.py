@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException, Request, Response, Query
+from fastapi import FastAPI, HTTPException, Request, Response, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 import json
 from crypto_utils import encrypt_data, decrypt_data
+from sheets_logger import sheets_logger
+
+# SECRET KEY for accessing logs
+LOGS_SECRET_KEY = "edumate_admin_secret"
 
 app = FastAPI()
 

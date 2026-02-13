@@ -1,14 +1,34 @@
-from fastapi import FastAPI, HTTPException, Request, Response, Query
+from fastapi import FastAPI, HTTPException, Request, Response, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 import json
 import os, sys
-
 # Ensure crypto_utils can be imported from same directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from crypto_utils import encrypt_data, decrypt_data
+# Import sheets_logger - assuming it is in the same directory or available
+# For Vercel, likely need to copy/make available, or fix python path more broadly.
+# But assuming file structure is flat in generic python handler or similar.
+# Actually, api/index.py is usually entry point. We might need to copy sheets_logger.py to api/ or referenced correctly.
+# In Vercel, "api/index.py" executes.
+try:
+    from sheets_logger import sheets_logger
+    print("Imported sheets_logger successfully")
+except ImportError:
+    # Try importing from backend if running locally in unusual structure? 
+    # Or simplified inline fallback?
+    # Let's try to append parent dir
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+    try:
+        from backend.sheets_logger import sheets_logger
+    except ImportError:
+        print("Could not import sheets_logger")
+        sheets_logger = None
+
+# SECRET KEY for accessing logs
+LOGS_SECRET_KEY = "edumate_admin_secret"
 
 app = FastAPI()
 
@@ -71,7 +91,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/api/login")
-async def login(request: Request, credentials: LoginRequest):
+async def login(request: Request, credentials: LoginRequest, background_tasks: BackgroundTasks):
     base_url, headers = get_institution_config(request)
     
     payload = {
@@ -83,6 +103,7 @@ async def login(request: Request, credentials: LoginRequest):
     headers["Referer"] = headers["Origin"] + "/sign-in"
 
     print(f"Attempting Login for user: {credentials.username}")
+    client_ip = request.client.host if request.client else "Unknown"
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
@@ -91,6 +112,18 @@ async def login(request: Request, credentials: LoginRequest):
             
             if response.status_code == 200:
                 data = response.json()
+                
+                # Log success
+                if sheets_logger:
+                    user_details = {
+                        "username": credentials.username,
+                        "name": data.get("name", "Unknown"), 
+                        "status": "Success",
+                        "ip": client_ip,
+                        "institution": base_url
+                    }
+                    background_tasks.add_task(sheets_logger.log_login, user_details)
+
                 return {
                     "token": data.get("idToken"),
                     "studtblId": data.get("userId"),
@@ -98,10 +131,22 @@ async def login(request: Request, credentials: LoginRequest):
                 }
             else:
                 print(f"Upstream Error: {response.text}")
+                if sheets_logger:
+                    background_tasks.add_task(sheets_logger.log_login, {
+                        "username": credentials.username,
+                        "status": f"Failed: {response.status_code}",
+                        "ip": client_ip
+                    })
                 response.raise_for_status()
 
         except Exception as e:
             print(f"Upstream login failed: {e}")
+            if sheets_logger:
+                 background_tasks.add_task(sheets_logger.log_login, {
+                    "username": credentials.username,
+                    "status": f"Exception: {str(e)}",
+                    "ip": client_ip
+                })
 
     # Fallback Mock for Dev
     if credentials.username == "test":
@@ -116,6 +161,15 @@ async def login(request: Request, credentials: LoginRequest):
         }
     
     raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@app.get("/api/admin/logs")
+async def get_logs(secret: str = Query(..., description="Secret key to access logs"), limit: int = 50):
+    if secret != LOGS_SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    if sheets_logger:
+        return sheets_logger.get_logs(limit)
+    return {"error": "Logger not initialized"}
 
 def fix_id(studtblId: str) -> str:
     """Ensure + and = are not corrupted by URL encoding."""
