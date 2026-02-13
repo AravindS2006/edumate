@@ -385,18 +385,18 @@ export default function Dashboard() {
 
             {/* ═══════════════════════ BODY ═══════════════════════ */}
             <motion.main initial="hidden" animate="visible" variants={stagger}
-                className="max-w-[1400px] mx-auto px-4 sm:px-8 py-5 space-y-5">
+                className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-5 space-y-3 sm:space-y-5">
 
                 {/* ── Greeting ── */}
                 <motion.div variants={fadeUp} className="space-y-1">
-                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800">
+                    <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight text-slate-800">
                         {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400">{firstName}</span> 👋
                     </h1>
-                    <p className="text-sm text-slate-500 font-medium">Here&apos;s your academic overview for today.</p>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Here&apos;s your academic overview for today.</p>
                 </motion.div>
 
                 {/* ━━━━━━━━━━ ROW 1: Stats Cards (6 items) ━━━━━━━━━━ */}
-                <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
                     <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
                         accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
                         badgeOk={attendPct >= 75} />
@@ -421,27 +421,27 @@ export default function Dashboard() {
                 </motion.div>
 
                 {/* ━━━━━━━━━━ ROW 2: Profile + Analytics ━━━━━━━━━━ */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
 
                     {/* ── Profile Card ── */}
                     <motion.div variants={fadeUp} className="lg:col-span-4">
                         <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 h-full">
                             {/* Banner */}
-                            <div className="h-28 relative overflow-hidden">
+                            <div className="h-20 sm:h-28 relative overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
                                 <div className="absolute inset-0 opacity-30"
                                     style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
                             </div>
 
                             {/* Avatar */}
-                            <div className="relative -mt-12 flex justify-center">
-                                <div className="w-24 h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
+                            <div className="relative -mt-10 sm:-mt-12 flex justify-center">
+                                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
                                     <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
                                 </div>
                             </div>
 
                             {/* Info */}
-                            <div className="px-5 pb-5 pt-3 text-center space-y-3">
+                            <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
                                 <div>
                                     <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
                                     <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
@@ -468,13 +468,13 @@ export default function Dashboard() {
                     </motion.div>
 
                     {/* ── Analytics Column ── */}
-                    <div className="lg:col-span-8 space-y-4">
+                    <div className="lg:col-span-8 space-y-3 sm:space-y-4">
 
                         {/* Attendance Ring + Breakdown */}
                         <motion.div variants={fadeUp}
-                            className="rounded-2xl p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-5">
+                            className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
                             {/* Ring */}
-                            <div className="relative w-32 h-32 flex-shrink-0">
+                            <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
                                 <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
                                     <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="8" />
                                     <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" strokeWidth="8" strokeLinecap="round"
@@ -505,8 +505,8 @@ export default function Dashboard() {
 
                         {/* Quick Info */}
                         <motion.div variants={fadeUp}
-                            className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden flex flex-col">
-                            <div className="p-5 flex-1 space-y-2">
+                            className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
+                            <div className="p-4 sm:p-5 space-y-2">
                                 <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                                     <div className="p-1.5 rounded-lg bg-indigo-500/10"><Sparkles size={14} className="text-indigo-400" /></div>
                                     Quick Info
@@ -532,11 +532,11 @@ export default function Dashboard() {
                 {/* ━━━━━━━━━━ ROW 3: Academic History + Family ━━━━━━━━━━ */}
                 {
                     (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
 
                             {acadPct && acadPct.records && acadPct.records.length > 0 && (
                                 <motion.div variants={fadeUp}
-                                    className="rounded-2xl p-5 border border-slate-200/60 bg-white">
+                                    className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
                                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
                                         <div className="p-1.5 rounded-lg bg-cyan-500/10"><BarChart3 size={14} className="text-cyan-400" /></div>
                                         Academic History
@@ -561,7 +561,7 @@ export default function Dashboard() {
 
                             {parentData && (parentData.father_name || parentData.mother_name) && (
                                 <motion.div variants={fadeUp}
-                                    className="rounded-2xl p-5 border border-slate-200/60 bg-white">
+                                    className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
                                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
                                         <div className="p-1.5 rounded-lg bg-pink-500/10"><Users size={14} className="text-pink-400" /></div>
                                         Family Details
@@ -582,7 +582,7 @@ export default function Dashboard() {
                     className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
 
                     {/* Report Header */}
-                    <div className="px-6 pt-5 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
+                    <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 border-b border-slate-100">
                         <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
                             <div className="p-1.5 rounded-lg bg-indigo-500/10"><BarChart3 size={16} className="text-indigo-400" /></div>
                             Academic Reports
@@ -590,7 +590,7 @@ export default function Dashboard() {
                         <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100">
                             {(['attendance', 'cat', 'endsem'] as const).map(t => (
                                 <button key={t} onClick={() => loadReport(t)}
-                                    className={`px-5 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${activeReport === t
+                                    className={`px-3 sm:px-5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all duration-300 ${activeReport === t
                                         ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-slate-800 shadow-lg shadow-indigo-500/25'
                                         : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                                         }`}>
@@ -601,7 +601,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Report Body */}
-                    <div className="p-6 min-h-[280px] relative">
+                    <div className="p-4 sm:p-6 min-h-[200px] sm:min-h-[280px] relative">
                         <AnimatePresence mode="wait">
 
                             {reportLoading && (
@@ -702,14 +702,14 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="mt-4 mb-6 px-4 max-w-[1400px] mx-auto"
+                className="mt-3 sm:mt-4 mb-4 sm:mb-6 px-3 sm:px-4 max-w-[1400px] mx-auto"
             >
                 <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
                         <Calendar size={24} />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800">Attendance Tracker</h2>
+                        <h2 className="text-lg sm:text-xl font-bold text-slate-800">Attendance Tracker</h2>
                         <p className="text-xs text-slate-500">Daily status & leave record</p>
                     </div>
                 </div>
@@ -723,7 +723,7 @@ export default function Dashboard() {
 
             {/* ═══════════════════════ FOOTER ═══════════════════════ */}
             <footer className="mt-auto border-t border-slate-100/80 bg-white/95">
-                <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-4 space-y-4">
+                <div className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-4 space-y-3 sm:space-y-4">
 
                     {/* ── Sairam Branding Grid ── */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -834,7 +834,7 @@ function StatCard({ icon: Icon, label, value, accent, badge, badgeOk }: StatCard
 
     return (
         <motion.div variants={fadeUp}
-            className="group rounded-2xl p-4 border border-slate-200/60 bg-white  flex flex-col justify-between h-[140px] hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 hover:border-slate-300">
+            className="group rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-slate-200/60 bg-white flex flex-col justify-between h-[110px] sm:h-[140px] hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 hover:border-slate-300">
             <div className="flex items-center justify-between">
                 <div className={`p-2 rounded-xl bg-gradient-to-br ${gradients[accent]}`}>
                     <Icon size={16} className={iconColors[accent]} />
