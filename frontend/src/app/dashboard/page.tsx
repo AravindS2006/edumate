@@ -15,7 +15,7 @@ import { AttendanceCalendar } from '@/components/AttendanceCalendar';
 import { CourseAttendance } from '@/components/CourseAttendance';
 import Image from 'next/image';
 
-import { StatCardSkeleton, ProfileSkeleton, AttendanceRingSkeleton } from '@/components/DashboardSkeletons';
+
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
 
@@ -149,15 +149,6 @@ export default function Dashboard() {
         else setGreeting('Good evening');
     }, []);
 
-    /* ── Optimization: Helper to safely parse JSON ── */
-    const safelyParse = (key: string) => {
-        if (typeof window === 'undefined') return null;
-        try {
-            const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : null;
-        } catch { return null; }
-    };
-
     /* ── Bootstrap ── */
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -167,27 +158,6 @@ export default function Dashboard() {
 
         setStudtblId(id);
 
-        // 1. Load from Cache Immediatley
-        const cachedStats = safelyParse(`cache_${id}_stats`);
-        const cachedPersonal = safelyParse(`cache_${id}_personal`);
-        const cachedAcademic = safelyParse(`cache_${id}_academic`);
-        const cachedAcadPct = safelyParse(`cache_${id}_acadPct`);
-        const cachedParent = safelyParse(`cache_${id}_parent`);
-
-        console.log("Dashboard: Cached Stats", cachedStats);
-        console.log("Dashboard: Cached Personal", cachedPersonal);
-
-        if (cachedStats) setStats(cachedStats);
-        if (cachedPersonal) setPersonal(cachedPersonal);
-        if (cachedAcademic) setAcademic(cachedAcademic);
-        if (cachedAcadPct) setAcadPct(cachedAcadPct);
-        if (cachedParent) setParentData(cachedParent);
-
-        // If we have at least stats and personal, we can show the UI immediately
-        if (cachedStats && cachedPersonal) {
-            setLoading(false);
-        }
-
         const institutionId = localStorage.getItem('institutionId') || 'SEC';
         const headers: Record<string, string> = {
             Authorization: `Bearer ${token}`,
@@ -195,46 +165,40 @@ export default function Dashboard() {
         };
         const eid = encodeURIComponent(id);
 
-        // 2. Progressive Fetch (Stale-while-revalidate)
-        const fetchAndCache = async (url: string, setter: (data: any) => void, key: string) => {
+        const fetchData = async () => {
             try {
-                const res = await fetch(url, { headers });
-                const json = await res.json(); // Always parse JSON first to check for error object
+                // Fetch all data concurrently
+                const [statsRes, personalRes, academicRes, acadPctRes, parentRes] = await Promise.all([
+                    fetch(`${API}/api/dashboard/stats?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/personal?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/academic?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/academic-exams?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/parent?studtblId=${eid}`, { headers })
+                ]);
 
-                if (res.ok && !json.error) {
-                    setter(json);
-                    localStorage.setItem(`cache_${id}_${key}`, JSON.stringify(json));
-                    if (!cachedStats) setLoading(false);
-                    return true;
-                } else {
-                    // Handle API error response (even with 200 OK)
-                    console.error(`API Error for ${key}:`, json.error || res.statusText);
-                    if (!cachedStats && key === 'stats') {
-                        setError(json.error || 'Failed to load data.');
-                    }
-                    return false;
-                }
-            } catch (e) {
-                console.error(`Failed to fetch ${key}`, e);
-                return false;
+                // Parse responses
+                const [statsData, personalData, academicData, acadPctData, parentData] = await Promise.all([
+                    statsRes.ok ? statsRes.json() : null,
+                    personalRes.ok ? personalRes.json() : null,
+                    academicRes.ok ? academicRes.json() : null,
+                    acadPctRes.ok ? acadPctRes.json() : null,
+                    parentRes.ok ? parentRes.json() : null
+                ]);
+
+                if (statsData) setStats(statsData);
+                if (personalData) setPersonal(personalData);
+                if (academicData) setAcademic(academicData);
+                if (acadPctData) setAcadPct(acadPctData);
+                if (parentData) setParentData(parentData);
+
+            } catch (err) {
+                console.error("Failed to load dashboard data", err);
+            } finally {
+                setLoading(false);
             }
         };
 
-        const loadFreshData = async () => {
-            // We fire these off in parallel
-            await Promise.allSettled([
-                fetchAndCache(`${API}/api/dashboard/stats?studtblId=${eid}`, setStats, 'stats'),
-                fetchAndCache(`${API}/api/student/personal?studtblId=${eid}`, setPersonal, 'personal'),
-                fetchAndCache(`${API}/api/student/academic?studtblId=${eid}`, setAcademic, 'academic'),
-                fetchAndCache(`${API}/api/student/academic-percentage?studtblId=${eid}`, setAcadPct, 'acadPct'),
-                fetchAndCache(`${API}/api/student/parent?studtblId=${eid}`, setParentData, 'parent'),
-            ]);
-
-            // Ensure loading stops after all attempts, even if failed
-            setLoading(false);
-        };
-
-        loadFreshData();
+        fetchData();
     }, [router]);
 
     /* ── Report Tab Click ── */
@@ -396,8 +360,17 @@ export default function Dashboard() {
         fetchAttendance();
     }, [studtblId, academic]);
 
-    /* ── Blocking Loading screen (REMOVED for progressive loading) ── */
-    // if (loading) return <LoadingScreen ... />
+    /* ── Blocking Loading screen ── */
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="animate-spin text-indigo-600" size={40} />
+                    <p className="text-slate-500 font-medium animate-pulse">Loading Dashboard...</p>
+                </div>
+            </div>
+        );
+    }
 
     /* ── Error screen ── */
     if (error && !stats && !personal) {
@@ -475,33 +448,15 @@ export default function Dashboard() {
                 {/* ━━━━━━━━━━ ROW 1: Stats Cards (4 items) ━━━━━━━━━━ */}
                 <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
                     className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-4">
-                    {!stats ? (
-                        loading ? (
-                            <>
-                                <StatCardSkeleton />
-                                <StatCardSkeleton />
-                                <StatCardSkeleton />
-                                <StatCardSkeleton />
-                            </>
-                        ) : (
-                            <div className="col-span-2 md:col-span-4 p-6 rounded-xl border border-red-100 bg-red-50/50 flex flex-col items-center justify-center text-center gap-2">
-                                <AlertCircle className="text-red-400" size={24} />
-                                <p className="text-xs font-semibold text-red-400">Failed to load statistics</p>
-                            </div>
-                        )
-                    ) : (
-                        <>
-                            <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
-                                accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
-                                badgeOk={attendPct >= 75} />
-                            <StatCard icon={TrendingUp} label="CGPA" value={cgpa.toFixed(2)}
-                                accent="indigo" badge="/ 10.00" />
-                            <StatCard icon={FileText} label="OD Count" value={String(stats?.od_count ?? 0)}
-                                accent="violet" badge={`${odPct}%`} />
-                            <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
-                                accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
-                        </>
-                    )}
+                    <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
+                        accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
+                        badgeOk={attendPct >= 75} />
+                    <StatCard icon={TrendingUp} label="CGPA" value={cgpa.toFixed(2)}
+                        accent="indigo" badge="/ 10.00" />
+                    <StatCard icon={FileText} label="OD Count" value={String(stats?.od_count ?? 0)}
+                        accent="violet" badge={`${odPct}%`} />
+                    <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
+                        accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
                 </motion.div>
 
                 {/* ━━━━━━━━━━ ROW 2: Profile + Analytics ━━━━━━━━━━ */}
@@ -510,9 +465,7 @@ export default function Dashboard() {
                     {/* ── Profile Card ── */}
                     <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
                         className="lg:col-span-4">
-                        {!personal || !academic ? (
-                            <ProfileSkeleton />
-                        ) : (
+                        {(!personal || !academic) ? null : (
                             <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 h-full">
                                 {/* Banner */}
                                 <div className="h-20 sm:h-28 relative overflow-hidden">
@@ -561,47 +514,36 @@ export default function Dashboard() {
 
                         {/* Attendance Ring + Breakdown */}
                         <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                            {!stats ? (
-                                loading ? (
-                                    <AttendanceRingSkeleton />
-                                ) : (
-                                    <div className="rounded-2xl p-8 border border-red-100 bg-red-50/50 flex flex-col items-center text-center gap-2">
-                                        <AlertCircle className="text-red-400" size={32} />
-                                        <p className="text-sm font-semibold text-red-500">Attendance data unavailable</p>
-                                    </div>
-                                )
-                            ) : (
-                                <div className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
-                                    {/* Ring */}
-                                    <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
-                                        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                                            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="8" />
-                                            <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" strokeWidth="8" strokeLinecap="round"
-                                                strokeDasharray={326.7} strokeDashoffset={326.7 - (326.7 * attendPct) / 100}
-                                                style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1)' }} />
-                                            <defs>
-                                                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-                                                    <stop offset="0%" stopColor="#06b6d4" />
-                                                    <stop offset="50%" stopColor="#6366f1" />
-                                                    <stop offset="100%" stopColor="#a855f7" />
-                                                </linearGradient>
-                                            </defs>
-                                        </svg>
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                            <span className="text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
-                                            <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold">percent</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Breakdown */}
-                                    <div className="flex-1 w-full space-y-3">
-                                        <h4 className="text-sm font-bold text-slate-800">Attendance Breakdown</h4>
-                                        <BarStat label="Present" pct={attendPct} color="from-cyan-500 to-indigo-500" />
-                                        <BarStat label="On Duty" pct={odPct} color="from-violet-500 to-purple-500" />
-                                        <BarStat label="Absent" pct={absentPct} color="from-rose-500 to-pink-500" />
+                            <div className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
+                                {/* Ring */}
+                                <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
+                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="8" />
+                                        <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" strokeWidth="8" strokeLinecap="round"
+                                            strokeDasharray={326.7} strokeDashoffset={326.7 - (326.7 * attendPct) / 100}
+                                            style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1)' }} />
+                                        <defs>
+                                            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                                                <stop offset="0%" stopColor="#06b6d4" />
+                                                <stop offset="50%" stopColor="#6366f1" />
+                                                <stop offset="100%" stopColor="#a855f7" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
+                                        <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold">percent</span>
                                     </div>
                                 </div>
-                            )}
+
+                                {/* Breakdown */}
+                                <div className="flex-1 w-full space-y-3">
+                                    <h4 className="text-sm font-bold text-slate-800">Attendance Breakdown</h4>
+                                    <BarStat label="Present" pct={attendPct} color="from-cyan-500 to-indigo-500" />
+                                    <BarStat label="On Duty" pct={odPct} color="from-violet-500 to-purple-500" />
+                                    <BarStat label="Absent" pct={absentPct} color="from-rose-500 to-pink-500" />
+                                </div>
+                            </div>
                         </motion.div>
 
                         {/* Quick Info */}
