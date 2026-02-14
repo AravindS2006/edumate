@@ -15,6 +15,8 @@ import { AttendanceCalendar } from '@/components/AttendanceCalendar';
 import { CourseAttendance } from '@/components/CourseAttendance';
 import Image from 'next/image';
 
+import { StatCardSkeleton, ProfileSkeleton, AttendanceRingSkeleton } from '@/components/DashboardSkeletons';
+
 /* ─────────────────────────────── Types ─────────────────────────────── */
 
 interface StatsData {
@@ -108,12 +110,17 @@ const slideIn = {
 export default function Dashboard() {
     const router = useRouter();
 
+
+
+    // ... (keep existing state definitions)
+
     const [stats, setStats] = useState<StatsData | null>(null);
     const [academic, setAcademic] = useState<AcademicData | null>(null);
     const [personal, setPersonal] = useState<PersonalData | null>(null);
     const [acadPct, setAcadPct] = useState<AcademicPercentage | null>(null);
     const [parentData, setParentData] = useState<ParentData | null>(null);
 
+    // Initial loading state can be false if we have cached data
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [studtblId, setStudtblId] = useState('');
@@ -142,13 +149,41 @@ export default function Dashboard() {
         else setGreeting('Good evening');
     }, []);
 
+    /* ── Optimization: Helper to safely parse JSON ── */
+    const safelyParse = (key: string) => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : null;
+        } catch { return null; }
+    };
+
     /* ── Bootstrap ── */
     useEffect(() => {
         const token = localStorage.getItem('token');
         const id = localStorage.getItem('studtblId') || '';
-        setStudtblId(id);
 
         if (!token) { router.push('/'); return; }
+
+        setStudtblId(id);
+
+        // 1. Load from Cache Immediatley
+        const cachedStats = safelyParse(`cache_${id}_stats`);
+        const cachedPersonal = safelyParse(`cache_${id}_personal`);
+        const cachedAcademic = safelyParse(`cache_${id}_academic`);
+        const cachedAcadPct = safelyParse(`cache_${id}_acadPct`);
+        const cachedParent = safelyParse(`cache_${id}_parent`);
+
+        if (cachedStats) setStats(cachedStats);
+        if (cachedPersonal) setPersonal(cachedPersonal);
+        if (cachedAcademic) setAcademic(cachedAcademic);
+        if (cachedAcadPct) setAcadPct(cachedAcadPct);
+        if (cachedParent) setParentData(cachedParent);
+
+        // If we have at least stats and personal, we can show the UI immediately
+        if (cachedStats && cachedPersonal) {
+            setLoading(false);
+        }
 
         const institutionId = localStorage.getItem('institutionId') || 'SEC';
         const headers: Record<string, string> = {
@@ -157,31 +192,46 @@ export default function Dashboard() {
         };
         const eid = encodeURIComponent(id);
 
-        const load = async () => {
+        // 2. Progressive Fetch (Stale-while-revalidate)
+        const fetchAndCache = async (url: string, setter: (data: any) => void, key: string) => {
             try {
-                // Load ALL data in parallel for fastest possible load
-                const [sRes, pRes, aRes, apRes, prRes] = await Promise.all([
-                    fetch(`${API}/api/dashboard/stats?studtblId=${eid}`, { headers }),
-                    fetch(`${API}/api/student/personal?studtblId=${eid}`, { headers }),
-                    fetch(`${API}/api/student/academic?studtblId=${eid}`, { headers }),
-                    fetch(`${API}/api/student/academic-percentage?studtblId=${eid}`, { headers }),
-                    fetch(`${API}/api/student/parent?studtblId=${eid}`, { headers }),
-                ]);
+                const res = await fetch(url, { headers });
+                const json = await res.json(); // Always parse JSON first to check for error object
 
-                if (sRes.ok) setStats(await sRes.json());
-                if (pRes.ok) setPersonal(await pRes.json());
-                if (aRes.ok) setAcademic(await aRes.json());
-                if (apRes.ok) setAcadPct(await apRes.json());
-                if (prRes.ok) setParentData(await prRes.json());
-            } catch (err) {
-                console.error("Load error", err);
-                setError('Network error — could not reach the server.');
-            } finally {
-                setLoading(false);
+                if (res.ok && !json.error) {
+                    setter(json);
+                    localStorage.setItem(`cache_${id}_${key}`, JSON.stringify(json));
+                    if (!cachedStats) setLoading(false);
+                    return true;
+                } else {
+                    // Handle API error response (even with 200 OK)
+                    console.error(`API Error for ${key}:`, json.error || res.statusText);
+                    if (!cachedStats && key === 'stats') {
+                        setError(json.error || 'Failed to load data.');
+                    }
+                    return false;
+                }
+            } catch (e) {
+                console.error(`Failed to fetch ${key}`, e);
+                return false;
             }
         };
 
-        load();
+        const loadFreshData = async () => {
+            // We fire these off in parallel
+            await Promise.allSettled([
+                fetchAndCache(`${API}/api/dashboard/stats?studtblId=${eid}`, setStats, 'stats'),
+                fetchAndCache(`${API}/api/student/personal?studtblId=${eid}`, setPersonal, 'personal'),
+                fetchAndCache(`${API}/api/student/academic?studtblId=${eid}`, setAcademic, 'academic'),
+                fetchAndCache(`${API}/api/student/academic-percentage?studtblId=${eid}`, setAcadPct, 'acadPct'),
+                fetchAndCache(`${API}/api/student/parent?studtblId=${eid}`, setParentData, 'parent'),
+            ]);
+
+            // Ensure loading stops after all attempts, even if failed
+            setLoading(false);
+        };
+
+        loadFreshData();
     }, [router]);
 
     /* ── Report Tab Click ── */
@@ -422,15 +472,26 @@ export default function Dashboard() {
                 {/* ━━━━━━━━━━ ROW 1: Stats Cards (4 items) ━━━━━━━━━━ */}
                 <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
                     className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-4">
-                    <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
-                        accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
-                        badgeOk={attendPct >= 75} />
-                    <StatCard icon={TrendingUp} label="CGPA" value={cgpa.toFixed(2)}
-                        accent="indigo" badge="/ 10.00" />
-                    <StatCard icon={FileText} label="OD Count" value={String(stats?.od_count ?? 0)}
-                        accent="violet" badge={`${odPct}%`} />
-                    <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
-                        accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
+                    {!stats ? (
+                        <>
+                            <StatCardSkeleton />
+                            <StatCardSkeleton />
+                            <StatCardSkeleton />
+                            <StatCardSkeleton />
+                        </>
+                    ) : (
+                        <>
+                            <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
+                                accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
+                                badgeOk={attendPct >= 75} />
+                            <StatCard icon={TrendingUp} label="CGPA" value={cgpa.toFixed(2)}
+                                accent="indigo" badge="/ 10.00" />
+                            <StatCard icon={FileText} label="OD Count" value={String(stats?.od_count ?? 0)}
+                                accent="violet" badge={`${odPct}%`} />
+                            <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
+                                accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
+                        </>
+                    )}
                 </motion.div>
 
                 {/* ━━━━━━━━━━ ROW 2: Profile + Analytics ━━━━━━━━━━ */}
@@ -439,82 +500,91 @@ export default function Dashboard() {
                     {/* ── Profile Card ── */}
                     <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
                         className="lg:col-span-4">
-                        <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 h-full">
-                            {/* Banner */}
-                            <div className="h-20 sm:h-28 relative overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
-                                <div className="absolute inset-0 opacity-30"
-                                    style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
-                            </div>
-
-                            {/* Avatar */}
-                            <div className="relative -mt-10 sm:-mt-12 flex justify-center">
-                                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
-                                    <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
-                                </div>
-                            </div>
-
-                            {/* Info */}
-                            <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
-                                <div>
-                                    <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
-                                    <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
-                                    {personal?.email && (
-                                        <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-center gap-1"><Mail size={10} />{personal.email}</p>
-                                    )}
+                        {!personal || !academic ? (
+                            <ProfileSkeleton />
+                        ) : (
+                            <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 h-full">
+                                {/* Banner */}
+                                <div className="h-20 sm:h-28 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
+                                    <div className="absolute inset-0 opacity-30"
+                                        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
                                 </div>
 
-                                <div className="space-y-1.5">
-                                    <ProfileRow icon={BookOpen} label="Department" value={academic?.dept || '—'} />
-                                    <div className="grid grid-cols-2 gap-1.5">
-                                        <ProfileRow icon={GraduationCap} label="Semester" value={academic?.semester_name || `Sem ${academic?.semester || '—'}`} />
-                                        <ProfileRow icon={Award} label="Batch" value={academic?.batch || '—'} />
+                                {/* Avatar */}
+                                <div className="relative -mt-10 sm:-mt-12 flex justify-center">
+                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
+                                        <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-1.5">
-                                        <ProfileRow icon={User} label="Admission" value={academic?.admission_mode || '—'} />
-                                        <ProfileRow icon={FileText} label="Univ Reg" value={academic?.university_reg_no || '—'} />
+                                </div>
+
+                                {/* Info */}
+                                <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
+                                    <div>
+                                        <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
+                                        <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
+                                        {personal?.email && (
+                                            <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-center gap-1"><Mail size={10} />{personal.email}</p>
+                                        )}
                                     </div>
-                                    {academic?.mentor_name && <ProfileRow icon={Users} label="Mentor" value={academic.mentor_name} />}
-                                    {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
+
+                                    <div className="space-y-1.5">
+                                        <ProfileRow icon={BookOpen} label="Department" value={academic?.dept || '—'} />
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            <ProfileRow icon={GraduationCap} label="Semester" value={academic?.semester_name || `Sem ${academic?.semester || '—'}`} />
+                                            <ProfileRow icon={Award} label="Batch" value={academic?.batch || '—'} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            <ProfileRow icon={User} label="Admission" value={academic?.admission_mode || '—'} />
+                                            <ProfileRow icon={FileText} label="Univ Reg" value={academic?.university_reg_no || '—'} />
+                                        </div>
+                                        {academic?.mentor_name && <ProfileRow icon={Users} label="Mentor" value={academic.mentor_name} />}
+                                        {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </motion.div>
 
                     {/* ── Analytics Column ── */}
                     <div className="lg:col-span-8 space-y-3 sm:space-y-4">
 
                         {/* Attendance Ring + Breakdown */}
-                        <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                            className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
-                            {/* Ring */}
-                            <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
-                                <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="8" />
-                                    <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" strokeWidth="8" strokeLinecap="round"
-                                        strokeDasharray={326.7} strokeDashoffset={326.7 - (326.7 * attendPct) / 100}
-                                        style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1)' }} />
-                                    <defs>
-                                        <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-                                            <stop offset="0%" stopColor="#06b6d4" />
-                                            <stop offset="50%" stopColor="#6366f1" />
-                                            <stop offset="100%" stopColor="#a855f7" />
-                                        </linearGradient>
-                                    </defs>
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
-                                    <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold">percent</span>
-                                </div>
-                            </div>
+                        <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                            {!stats ? (
+                                <AttendanceRingSkeleton />
+                            ) : (
+                                <div className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
+                                    {/* Ring */}
+                                    <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
+                                        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                                            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="8" />
+                                            <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" strokeWidth="8" strokeLinecap="round"
+                                                strokeDasharray={326.7} strokeDashoffset={326.7 - (326.7 * attendPct) / 100}
+                                                style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1)' }} />
+                                            <defs>
+                                                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                                                    <stop offset="0%" stopColor="#06b6d4" />
+                                                    <stop offset="50%" stopColor="#6366f1" />
+                                                    <stop offset="100%" stopColor="#a855f7" />
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                            <span className="text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
+                                            <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold">percent</span>
+                                        </div>
+                                    </div>
 
-                            {/* Breakdown */}
-                            <div className="flex-1 w-full space-y-3">
-                                <h4 className="text-sm font-bold text-slate-800">Attendance Breakdown</h4>
-                                <BarStat label="Present" pct={attendPct} color="from-cyan-500 to-indigo-500" />
-                                <BarStat label="On Duty" pct={odPct} color="from-violet-500 to-purple-500" />
-                                <BarStat label="Absent" pct={absentPct} color="from-rose-500 to-pink-500" />
-                            </div>
+                                    {/* Breakdown */}
+                                    <div className="flex-1 w-full space-y-3">
+                                        <h4 className="text-sm font-bold text-slate-800">Attendance Breakdown</h4>
+                                        <BarStat label="Present" pct={attendPct} color="from-cyan-500 to-indigo-500" />
+                                        <BarStat label="On Duty" pct={odPct} color="from-violet-500 to-purple-500" />
+                                        <BarStat label="Absent" pct={absentPct} color="from-rose-500 to-pink-500" />
+                                    </div>
+                                </div>
+                            )}
                         </motion.div>
 
                         {/* Quick Info */}
