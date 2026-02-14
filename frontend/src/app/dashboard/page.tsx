@@ -1,18 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Calendar, BookOpen, GraduationCap, BarChart3,
     FileText, LogOut, AlertCircle, Loader2,
-    User, TrendingUp, Award, Clock, Users,
+    User, TrendingUp, Award, Users,
     CheckCircle2, XCircle, Mail, Phone, Bus,
-    Download, X, ChevronRight, Sparkles,
-    MapPin, Heart, History as HistoryIcon
+    Download, X, ChevronRight, Sparkles, Heart, ExternalLink
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AttendanceCalendar } from '@/components/AttendanceCalendar';
 import { CourseAttendance } from '@/components/CourseAttendance';
+import { BottomNav, type NavTab } from '@/components/BottomNav';
 import Image from 'next/image';
 
 
@@ -31,6 +31,8 @@ interface StatsData {
     mentor_name: string;
     total_semesters: number;
     total_years: number;
+    pgpa: number;
+    raw_data?: any;
 }
 
 interface AcademicData {
@@ -85,7 +87,8 @@ interface ParentData {
 
 /* ─────────────────────────────── Constants ─────────────────────────── */
 
-const API = process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : '';
+// Use relative URLs so Next.js rewrites proxy to backend (avoids CORS)
+const API = '';
 
 const stagger = {
     hidden: {},
@@ -139,6 +142,10 @@ export default function Dashboard() {
     const [attendanceCourse, setAttendanceCourse] = useState<any[]>([]);
     const [leaveData, setLeaveData] = useState<any[]>([]);
     const [attendanceLoading, setAttendanceLoading] = useState(false);
+    const [attendanceError, setAttendanceError] = useState<string | null>(null);
+
+    // Bottom nav tab
+    const [activeTab, setActiveTab] = useState<NavTab>('home');
 
     // Greeting
     const [greeting, setGreeting] = useState('Good day');
@@ -172,7 +179,7 @@ export default function Dashboard() {
                     fetch(`${API}/api/dashboard/stats?studtblId=${eid}`, { headers }),
                     fetch(`${API}/api/student/personal?studtblId=${eid}`, { headers }),
                     fetch(`${API}/api/student/academic?studtblId=${eid}`, { headers }),
-                    fetch(`${API}/api/student/academic-exams?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/student/academic-percentage?studtblId=${eid}`, { headers }),
                     fetch(`${API}/api/student/parent?studtblId=${eid}`, { headers })
                 ]);
 
@@ -313,45 +320,65 @@ export default function Dashboard() {
 
         const fetchAttendance = async () => {
             setAttendanceLoading(true);
+            setAttendanceError(null);
             const headers = {
                 Authorization: `Bearer ${localStorage.getItem('token')}`,
                 'X-Institution-Id': localStorage.getItem('institutionId') || 'SEC'
             };
 
-            // Use IDs from the academic record
+            // Use IDs from the academic record (backend normalizes to snake_case for both SEC and SIT)
             const params = new URLSearchParams({
                 studtblId,
-                academicYearId: String(academic.academic_year_id),
-                branchId: String(academic.branch_id),
-                semesterId: String(academic.semester),
-                yearOfStudyId: String(academic.year_of_study_id),
-                sectionId: String(academic.section_id)
+                academicYearId: String(academic.academic_year_id ?? 14),
+                branchId: String(academic.branch_id ?? 2),
+                semesterId: String(academic.semester ?? 6),
+                yearOfStudyId: String(academic.year_of_study_id ?? 3),
+                sectionId: String(academic.section_id ?? 1)
             });
 
             try {
-                // Parallel fetch
-                const [dailyRes, leaveRes, courseRes] = await Promise.all([
-                    fetch(`${API}/api/attendance/daily-detail?${params}`, { headers }),
-                    fetch(`${API}/api/attendance/leave-status?${params}`, { headers }),
-                    fetch(`${API}/api/attendance/course-detail?${params}`, { headers })
+                const [dailyRes, leaveRes, courseRes, examRes] = await Promise.all([
+                    fetch(`/api/attendance/daily-detail?${params}`, { headers }),
+                    fetch(`/api/attendance/leave-status?${params}`, { headers }),
+                    fetch(`/api/attendance/course-detail?${params}`, { headers }),
+                    fetch(`/api/student/exam-status?${params}`, { headers })
                 ]);
 
-                if (dailyRes.ok) {
-                    const dailyJson = await dailyRes.json();
-                    if (dailyJson.data) setAttendanceDaily(dailyJson.data);
+                const errors: string[] = [];
+
+                // Process Exam Status (Arrears) - Update existing stats
+                const examJson = await examRes.json().catch(() => ({}));
+                if (examRes.ok && !examJson.error) {
+                    setStats(prev => {
+                        if (!prev) return null;
+                        return {
+                            ...prev,
+                            arrears: examJson.arrears_current || 0,
+                            // Optionally update OD if dashboard was 0 but this has value?
+                            // od_percentage: prev.od_percentage || examJson.od_pct || 0 
+                        };
+                    });
                 }
 
-                if (leaveRes.ok) {
-                    const leaveJson = await leaveRes.json();
-                    if (leaveJson.data) setLeaveData(leaveJson.data);
-                }
+                const dailyJson = await dailyRes.json().catch(() => ({}));
+                if (dailyRes.ok && dailyJson.data) {
+                    setAttendanceDaily(Array.isArray(dailyJson.data) ? dailyJson.data : []);
+                } else if (dailyJson.error) errors.push(dailyJson.error);
 
-                if (courseRes.ok) {
-                    const courseJson = await courseRes.json();
-                    if (courseJson.data) setAttendanceCourse(courseJson.data);
-                }
+                const leaveJson = await leaveRes.json().catch(() => ({}));
+                if (leaveRes.ok && leaveJson.data) {
+                    setLeaveData(Array.isArray(leaveJson.data) ? leaveJson.data : []);
+                } else if (leaveJson.error) errors.push(leaveJson.error);
+
+                const courseJson = await courseRes.json().catch(() => ({}));
+                if (courseRes.ok && courseJson.data) {
+                    setAttendanceCourse(Array.isArray(courseJson.data) ? courseJson.data : []);
+                } else if (courseJson.error) errors.push(courseJson.error);
+
+                if (errors.length > 0) setAttendanceError(errors.join('. '));
             } catch (err) {
                 console.error("Failed to load attendance", err);
+                setAttendanceError('Network error. Please check your connection.');
             } finally {
                 setAttendanceLoading(false);
             }
@@ -400,7 +427,7 @@ export default function Dashboard() {
 
     /* ─────────────────────────────── Render ─────────────────────────────── */
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 overflow-x-hidden">
+        <div className="min-h-[100dvh] bg-slate-50 text-slate-800 overflow-x-hidden pb-24 md:pb-28">
 
             {/* ── Ambient background ── */}
             <div className="fixed inset-0 pointer-events-none -z-10">
@@ -410,420 +437,452 @@ export default function Dashboard() {
             </div>
 
             {/* ═══════════════════════ HEADER ═══════════════════════ */}
-            <header className="sticky top-0 z-50 border-b border-slate-200/60 backdrop-blur-2xl bg-white/80">
-                <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center shadow-md shadow-indigo-100 ring-1 ring-slate-100 overflow-hidden">
+            <header className="sticky top-0 z-40 border-b border-slate-200/60 backdrop-blur-2xl bg-white/90">
+                <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-2.5 sm:py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                        <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white flex items-center justify-center shadow-md shadow-indigo-100 ring-1 ring-slate-100 overflow-hidden">
                             <Image src="/assets/SAIRAM-ROUND-LOGO.png" alt="Sairam" width={28} height={28} className="object-contain" />
                         </div>
                         <div className="leading-tight">
                             <p className="text-sm font-extrabold tracking-tight text-slate-800">EduMate</p>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase tracking-[0.2em]">Sairam Student Portal</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase tracking-[0.2em] hidden sm:block">Sairam Student Portal</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className="hidden sm:block text-[11px] text-slate-500 font-medium">
-                            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <span className="hidden md:block text-[11px] text-slate-500 font-medium">
+                            {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                         </span>
                         <button onClick={() => { localStorage.clear(); router.push('/'); }}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 hover:border-red-200 transition-all">
-                            <LogOut size={13} /> Sign Out
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 hover:border-red-200 transition-all active:scale-95">
+                            <LogOut size={14} /> <span className="hidden sm:inline">Sign Out</span>
                         </button>
                     </div>
                 </div>
             </header>
 
-            {/* ═══════════════════════ BODY ═══════════════════════ */}
+            {/* ═══════════════════════ BODY (Tabbed) ═══════════════════════ */}
             <motion.main initial="hidden" animate="visible" variants={stagger}
-                className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-4 space-y-3 sm:space-y-4">
+                className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-4 min-h-[calc(100vh-8rem)]">
 
-                {/* ── Greeting ── */}
-                <motion.div variants={fadeUp} className="space-y-1">
-                    <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight text-slate-800">
-                        {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400">{firstName}</span> 👋
-                    </h1>
-                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Here&apos;s your academic overview for today.</p>
-                </motion.div>
+                <AnimatePresence mode="wait">
+                    {activeTab === 'home' && (
+                        <motion.div
+                            key="home"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="space-y-3 sm:space-y-4"
+                        >
+                            {/* ── Greeting ── */}
+                            <motion.div variants={fadeUp} initial="hidden" animate="visible" className="space-y-1">
+                                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800">
+                                    {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">{firstName}</span> 👋
+                                </h1>
+                                <p className="text-sm text-slate-500 font-medium">Here&apos;s your academic overview for today.</p>
+                            </motion.div>
 
-                {/* ━━━━━━━━━━ ROW 1: Stats Cards (4 items) ━━━━━━━━━━ */}
-                <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                    className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-4">
-                    <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
-                        accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
-                        badgeOk={attendPct >= 75} />
-                    <StatCard icon={TrendingUp} label="CGPA" value={cgpa.toFixed(2)}
-                        accent="indigo" badge="/ 10.00" />
-                    <StatCard icon={FileText} label="OD Count" value={String(stats?.od_count ?? 0)}
-                        accent="violet" badge={`${odPct}%`} />
-                    <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
-                        accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
-                </motion.div>
 
-                {/* ━━━━━━━━━━ ROW 2: Profile + Analytics ━━━━━━━━━━ */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-
-                    {/* ── Profile Card ── */}
-                    <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                        className="lg:col-span-4">
-                        {(!personal || !academic) ? null : (
-                            <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 h-full">
-                                {/* Banner */}
-                                <div className="h-20 sm:h-28 relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
-                                    <div className="absolute inset-0 opacity-30"
-                                        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
+                            {/* ━━━━━━━━━━ ROW 1: Stats Cards (4 items) ━━━━━━━━━━ */}
+                            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+                                <div onClick={() => setActiveTab('attendance')} className="cursor-pointer transition-transform active:scale-95">
+                                    <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
+                                        accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
+                                        badgeOk={attendPct >= 75} />
                                 </div>
+                                <StatCard icon={TrendingUp} label="CGPA" value={cgpa.toFixed(2)}
+                                    accent="indigo" badge="/ 10.00" />
+                                <StatCard icon={Sparkles} label="PGPA" value={String(stats?.pgpa || stats?.raw_data?.pG_Cgpa || 0)}
+                                    accent="amber" badge="Points" />
+                                <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
+                                    accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
+                            </motion.div>
 
-                                {/* Avatar */}
-                                <div className="relative -mt-10 sm:-mt-12 flex justify-center">
-                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
-                                        <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
-                                    </div>
-                                </div>
+                            {/* ━━━━━━━━━━ ROW 2: Analytics (Attendance Ring + Quick Info) ━━━━━━━━━━ */}
+                            <div className="space-y-3 sm:space-y-4">
 
-                                {/* Info */}
-                                <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
-                                    <div>
-                                        <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
-                                        <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
-                                        {personal?.email && (
-                                            <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-center gap-1"><Mail size={10} />{personal.email}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <ProfileRow icon={BookOpen} label="Department" value={academic?.dept || '—'} />
-                                        <div className="grid grid-cols-2 gap-1.5">
-                                            <ProfileRow icon={GraduationCap} label="Semester" value={academic?.semester_name || `Sem ${academic?.semester || '—'}`} />
-                                            <ProfileRow icon={Award} label="Batch" value={academic?.batch || '—'} />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-1.5">
-                                            <ProfileRow icon={User} label="Admission" value={academic?.admission_mode || '—'} />
-                                            <ProfileRow icon={FileText} label="Univ Reg" value={academic?.university_reg_no || '—'} />
-                                        </div>
-                                        {academic?.mentor_name && <ProfileRow icon={Users} label="Mentor" value={academic.mentor_name} />}
-                                        {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </motion.div>
-
-                    {/* ── Analytics Column ── */}
-                    <div className="lg:col-span-8 space-y-3 sm:space-y-4">
-
-                        {/* Attendance Ring + Breakdown */}
-                        <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                            <div className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
-                                {/* Ring */}
-                                <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
-                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="8" />
-                                        <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" strokeWidth="8" strokeLinecap="round"
-                                            strokeDasharray={326.7} strokeDashoffset={326.7 - (326.7 * attendPct) / 100}
-                                            style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1)' }} />
-                                        <defs>
-                                            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-                                                <stop offset="0%" stopColor="#06b6d4" />
-                                                <stop offset="50%" stopColor="#6366f1" />
-                                                <stop offset="100%" stopColor="#a855f7" />
-                                            </linearGradient>
-                                        </defs>
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                        <span className="text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
-                                        <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold">percent</span>
-                                    </div>
-                                </div>
-
-                                {/* Breakdown */}
-                                <div className="flex-1 w-full space-y-3">
-                                    <h4 className="text-sm font-bold text-slate-800">Attendance Breakdown</h4>
-                                    <BarStat label="Present" pct={attendPct} color="from-cyan-500 to-indigo-500" />
-                                    <BarStat label="On Duty" pct={odPct} color="from-violet-500 to-purple-500" />
-                                    <BarStat label="Absent" pct={absentPct} color="from-rose-500 to-pink-500" />
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* Quick Info */}
-                        <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                            className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
-                            <div className="p-4 sm:p-5 space-y-2">
-                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                    <div className="p-1.5 rounded-lg bg-indigo-500/10"><Sparkles size={14} className="text-indigo-400" /></div>
-                                    Quick Info
-                                </h4>
-                                {stats?.program && <ProfileRow icon={Award} label="Programme" value={stats.program} />}
-                                {academic?.current_academic_year && <ProfileRow icon={Calendar} label="Academic Year" value={academic.current_academic_year} />}
-                                {stats?.mentor_name && <ProfileRow icon={User} label="Mentor" value={stats.mentor_name} />}
-                                {personal?.gender && <ProfileRow icon={User} label="Gender" value={personal.gender} />}
-                                {personal?.date_of_birth && <ProfileRow icon={Calendar} label="DOB" value={`${personal.date_of_birth} (Age: ${personal.age})`} />}
-                            </div>
-                            <div className="px-5 py-3 border-t border-slate-100/80 flex items-center gap-3 bg-white">
-                                <img src="https://student.sairam.edu.in/assets/sairam-founder-SphLKZaX.png" alt="Founder"
-                                    className="h-10 w-10 rounded-full object-cover border border-slate-200 flex-shrink-0" />
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-500 italic">&quot;Success is a journey, not a destination.&quot;</p>
-                                    <p className="text-[9px] text-slate-500">— MJF. Ln. Leo Muthu, Founder Chairman</p>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                </div>
-
-                {/* ━━━━━━━━━━ ROW 3: Academic History + Family ━━━━━━━━━━ */}
-                {
-                    (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) && (
-                        <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                            className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-
-                            {acadPct && acadPct.records && acadPct.records.length > 0 && (
-                                <motion.div variants={fadeUp}
-                                    className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
-                                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                        <div className="p-1.5 rounded-lg bg-cyan-500/10"><BarChart3 size={14} className="text-cyan-400" /></div>
-                                        Academic History
-                                    </h4>
-                                    <div className="space-y-3">
-                                        {acadPct.records.map((r, i) => (
-                                            <div key={i} className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-700">{r.exam}</p>
-                                                    <p className="text-[10px] text-slate-500 font-medium">Year of Passing: {r.year}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 tabular-nums">
-                                                        {parseFloat(r.percentage).toFixed(1)}%
-                                                    </p>
-                                                </div>
+                                {/* Attendance Ring + Breakdown */}
+                                <motion.div id="attendance-section" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                                    <div className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
+                                        {/* Ring */}
+                                        <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
+                                            <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                                                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="8" />
+                                                <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" strokeWidth="8" strokeLinecap="round"
+                                                    strokeDasharray={326.7} strokeDashoffset={326.7 - (326.7 * attendPct) / 100}
+                                                    style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1)' }} />
+                                                <defs>
+                                                    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                                                        <stop offset="0%" stopColor="#06b6d4" />
+                                                        <stop offset="50%" stopColor="#6366f1" />
+                                                        <stop offset="100%" stopColor="#a855f7" />
+                                                    </linearGradient>
+                                                </defs>
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-2xl sm:text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
+                                                <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold">percent</span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
+                                        </div>
 
-                            {parentData && (parentData.father_name || parentData.mother_name) && (
-                                <motion.div variants={fadeUp}
-                                    className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
-                                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                        <div className="p-1.5 rounded-lg bg-pink-500/10"><Users size={14} className="text-pink-400" /></div>
-                                        Family Details
-                                    </h4>
-                                    <div className="space-y-3">
-                                        {parentData.father_name && <FamilyCard label="Father" name={parentData.father_name} occupation={parentData.father_occupation} mobile={parentData.father_mobile} />}
-                                        {parentData.mother_name && <FamilyCard label="Mother" name={parentData.mother_name} occupation={parentData.mother_occupation} mobile={parentData.mother_mobile} />}
-                                        {parentData.guardian_name && <FamilyCard label="Guardian" name={parentData.guardian_name} occupation={parentData.guardian_occupation} mobile={parentData.guardian_mobile} />}
+                                        {/* Breakdown */}
+                                        <div className="flex-1 w-full space-y-3">
+                                            <h4 className="text-sm font-bold text-slate-800">Attendance Breakdown</h4>
+                                            <BarStat label="Present" pct={attendPct} color="from-cyan-500 to-indigo-500" />
+                                            <BarStat label="On Duty" pct={odPct} color="from-violet-500 to-purple-500" />
+                                            <BarStat label="Absent" pct={absentPct} color="from-rose-500 to-pink-500" />
+                                        </div>
                                     </div>
                                 </motion.div>
-                            )}
+
+                                {/* Quick Info */}
+                                <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                                    className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
+                                    <div className="p-4 sm:p-5 space-y-2">
+                                        <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                            <div className="p-1.5 rounded-lg bg-indigo-500/10"><Sparkles size={14} className="text-indigo-400" /></div>
+                                            Quick Info
+                                        </h4>
+                                        {stats?.program && <ProfileRow icon={Award} label="Programme" value={stats.program} />}
+                                        {academic?.current_academic_year && <ProfileRow icon={Calendar} label="Academic Year" value={academic.current_academic_year} />}
+                                        {stats?.mentor_name && <ProfileRow icon={User} label="Mentor" value={stats.mentor_name} />}
+                                        {personal?.gender && <ProfileRow icon={User} label="Gender" value={personal.gender} />}
+                                        {personal?.date_of_birth && <ProfileRow icon={Calendar} label="DOB" value={`${personal.date_of_birth} (Age: ${personal.age})`} />}
+                                    </div>
+
+                                </motion.div>
+                            </div>
+
+
+
+                            {/* Home tab footer branding - compact */}
+                            <motion.div variants={fadeUp} className="pt-4 flex justify-center">
+                                <div className="flex items-center gap-2 text-slate-400 text-xs">
+                                    <span>Built with</span><Heart size={12} className="text-red-400 fill-red-400" /><span>by Sairamite</span>
+                                </div>
+                            </motion.div>
                         </motion.div>
-                    )
-                }
+                    )}
 
-                {/* ── Attendance Calendar Section ── */}
-                <motion.div variants={fadeUp} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-purple-500/10 rounded-lg text-purple-400">
-                            <Calendar size={20} />
-                        </div>
-                        <div>
-                            <h2 className="text-base font-bold text-slate-800">Attendance Tracker</h2>
-                            <p className="text-[10px] text-slate-500">Daily status & leave record</p>
-                        </div>
-                    </div>
 
-                    <AttendanceCalendar
-                        dailyData={attendanceDaily}
-                        leaveData={leaveData}
-                        loading={attendanceLoading}
-                    />
-                </motion.div>
 
-                {/* ── Course Attendance Gauges ── */}
-                <motion.div variants={fadeUp} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
-                            <BookOpen size={20} />
-                        </div>
-                        <div>
-                            <h2 className="text-base font-bold text-slate-800">Course-wise Attendance</h2>
-                            <p className="text-[10px] text-slate-500">Subject performance tracker</p>
-                        </div>
-                    </div>
+                    {activeTab === 'profile' && (
+                        <motion.div
+                            key="profile"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="space-y-3 sm:space-y-4"
+                        >
+                            {/* ── Profile Card ── */}
+                            {(!personal || !academic) ? null : (
+                                <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                                    <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50">
+                                        <div className="h-20 sm:h-28 relative overflow-hidden">
+                                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
+                                            <div className="absolute inset-0 opacity-30"
+                                                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
+                                        </div>
+                                        <div className="relative -mt-10 sm:-mt-12 flex justify-center">
+                                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
+                                                <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
+                                            </div>
+                                        </div>
+                                        <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
+                                            <div>
+                                                <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
+                                                <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
+                                                {personal?.email && (
+                                                    <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-center gap-1"><Mail size={10} />{personal.email}</p>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <ProfileRow icon={BookOpen} label="Department" value={academic?.dept || '—'} />
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <ProfileRow icon={GraduationCap} label="Semester" value={academic?.semester_name || `Sem ${academic?.semester || '—'}`} />
+                                                    <ProfileRow icon={Award} label="Batch" value={academic?.batch || '—'} />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <ProfileRow icon={User} label="Admission" value={academic?.admission_mode || '—'} />
+                                                    <ProfileRow icon={FileText} label="Univ Reg" value={academic?.university_reg_no || '—'} />
+                                                </div>
+                                                {academic?.mentor_name && <ProfileRow icon={Users} label="Mentor" value={academic.mentor_name} />}
+                                                {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
+                                            </div>
+                                        </div>
 
-                    <CourseAttendance
-                        courses={attendanceCourse}
-                        loading={attendanceLoading}
-                    />
-                </motion.div>
-
-                {/* ━━━━━━━━━━ ROW 4: Reports ━━━━━━━━━━ */}
-                <motion.div variants={fadeUp}
-                    className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
-
-                    {/* Report Header */}
-                    <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 border-b border-slate-100">
-                        <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-indigo-500/10"><BarChart3 size={16} className="text-indigo-400" /></div>
-                            Academic Reports
-                        </h3>
-                        <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100">
-                            {(['attendance', 'cat', 'endsem'] as const).map(t => (
-                                <button key={t} onClick={() => loadReport(t)}
-                                    className={`px-3 sm:px-5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all duration-300 ${activeReport === t
-                                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-slate-800 shadow-lg shadow-indigo-500/25'
-                                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                                        }`}>
-                                    {t === 'attendance' ? 'Attendance' : t === 'cat' ? 'CAT Marks' : 'End Sem'}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Report Body */}
-                    <div className="p-4 sm:p-6 min-h-[200px] sm:min-h-[280px] relative">
-                        <AnimatePresence mode="wait">
-
-                            {reportLoading && (
-                                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                    className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-sm">
-                                    <div className="flex items-center gap-3">
-                                        <Loader2 className="animate-spin text-indigo-400" size={24} />
-                                        <span className="text-sm text-slate-500 font-medium">Loading report data…</span>
                                     </div>
                                 </motion.div>
                             )}
+                            {/* ── Academic History + Family ── */}
+                            {
+                                (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) ? (
+                                    <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                                        className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
 
-                            {!activeReport && !reportLoading && (
-                                <motion.div key="empty" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                                    className="flex flex-col items-center justify-center h-[240px] text-slate-500 gap-4">
-                                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
-                                        <BarChart3 size={36} />
+                                        {acadPct && acadPct.records && acadPct.records.length > 0 && (
+                                            <motion.div variants={fadeUp}
+                                                className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
+                                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+                                                    <div className="p-1.5 rounded-lg bg-cyan-500/10"><BarChart3 size={14} className="text-cyan-400" /></div>
+                                                    Academic History
+                                                </h4>
+                                                <div className="space-y-3">
+                                                    {acadPct.records.map((r, i) => (
+                                                        <div key={i} className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
+                                                            <div>
+                                                                <p className="text-sm font-bold text-slate-700">{r.exam}</p>
+                                                                <p className="text-[10px] text-slate-500 font-medium">Year of Passing: {r.year}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 tabular-nums">
+                                                                    {parseFloat(r.percentage).toFixed(1)}%
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {parentData && (parentData.father_name || parentData.mother_name) && (
+                                            <motion.div variants={fadeUp}
+                                                className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
+                                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+                                                    <div className="p-1.5 rounded-lg bg-pink-500/10"><Users size={14} className="text-pink-400" /></div>
+                                                    Family Details
+                                                </h4>
+                                                <div className="space-y-3">
+                                                    {parentData.father_name && <FamilyCard label="Father" name={parentData.father_name} occupation={parentData.father_occupation} mobile={parentData.father_mobile} />}
+                                                    {parentData.mother_name && <FamilyCard label="Mother" name={parentData.mother_name} occupation={parentData.mother_occupation} mobile={parentData.mother_mobile} />}
+                                                    {parentData.guardian_name && <FamilyCard label="Guardian" name={parentData.guardian_name} occupation={parentData.guardian_occupation} mobile={parentData.guardian_mobile} />}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </motion.div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                                        <BookOpen size={48} className="mb-4 opacity-50" />
+                                        <p>No additional information available.</p>
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-sm font-semibold text-slate-500">Select a report type</p>
-                                        <p className="text-xs text-slate-500 mt-1">Choose Attendance, CAT, or End Sem to view PDF reports</p>
-                                    </div>
+                                )
+                            }
+
+                            {/* ── Debug Section ── */}
+                            {stats?.raw_data && (
+                                <motion.div variants={fadeUp} className="mt-4 mb-4 p-4 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
+                                    <details className="group">
+                                        <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-500 uppercase tracking-widest list-none">
+                                            <span className="transition group-open:rotate-90">▶</span> Debug: Raw Backend Data
+                                        </summary>
+                                        <pre className="mt-4 text-[10px] text-slate-600 font-mono overflow-auto max-h-60 bg-white p-3 rounded-lg border border-slate-200">
+                                            {JSON.stringify(stats.raw_data, null, 2)}
+                                        </pre>
+                                    </details>
                                 </motion.div>
                             )}
 
-                            {activeReport && reportSemesters.length > 0 && !pdfUrl && !reportLoading && (
-                                <motion.div key="semesters" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                                    className="space-y-4">
-                                    <p className="text-xs text-slate-500 font-medium">Select a semester to generate the report:</p>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                        {reportSemesters.map((s: any) => (
-                                            <button key={s.id} onClick={() => downloadReport(s.id)}
-                                                className={`group px-4 py-3.5 rounded-xl text-sm font-bold border transition-all duration-300 flex items-center justify-between ${selectedSemester === s.id
-                                                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 border-indigo-500/50 text-slate-800 shadow-lg shadow-indigo-500/20'
-                                                    : 'bg-slate-50 border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:border-indigo-500/30 hover:-translate-y-0.5'
+                            <motion.div variants={fadeUp} className="pt-4 flex justify-center">
+                                <div className="flex items-center gap-2 text-slate-400 text-xs">
+                                    <span>Built with</span><Heart size={12} className="text-red-400 fill-red-400" /><span>by Sairamite</span>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'attendance' && (
+                        <motion.div
+                            key="attendance"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="space-y-3 sm:space-y-4"
+                        >
+                            {/* ── Attendance error banner ── */}
+                            {attendanceError && (
+                                <div className="rounded-xl p-3 bg-amber-50 border border-amber-200 flex items-center gap-2">
+                                    <AlertCircle size={18} className="text-amber-500 flex-shrink-0" />
+                                    <p className="text-sm text-amber-800">{attendanceError}</p>
+                                </div>
+                            )}
+                            {/* ── Attendance Calendar Section ── */}
+                            <div className="space-y-2">
+                                <AttendanceCalendar
+                                    dailyData={attendanceDaily}
+                                    leaveData={leaveData}
+                                    loading={attendanceLoading}
+                                />
+                            </div>
+
+                            {/* ── Course Attendance Gauges ── */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                                        <BookOpen size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-base font-bold text-slate-800">Course-wise Attendance</h2>
+                                        <p className="text-[10px] text-slate-500">Subject performance tracker</p>
+                                    </div>
+                                </div>
+
+                                <CourseAttendance
+                                    courses={attendanceCourse}
+                                    loading={attendanceLoading}
+                                />
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'reports' && (
+                        <motion.div
+                            key="reports"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="space-y-3 sm:space-y-4"
+                        >
+                            {/* ━━━━━━━━━━ Reports ━━━━━━━━━━ */}
+                            <div
+                                className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden">
+
+                                {/* Report Header */}
+                                <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 border-b border-slate-100">
+                                    <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                                        <div className="p-1.5 rounded-lg bg-indigo-500/10"><BarChart3 size={16} className="text-indigo-400" /></div>
+                                        Academic Reports
+                                    </h3>
+                                    <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100">
+                                        {(['attendance', 'cat', 'endsem'] as const).map(t => (
+                                            <button key={t} onClick={() => loadReport(t)}
+                                                className={`px-3 sm:px-5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all duration-300 ${activeReport === t
+                                                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-slate-800 shadow-lg shadow-indigo-500/25'
+                                                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                                                     }`}>
-                                                <span>{s.name || `Semester ${s.number}`}</span>
-                                                <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                {t === 'attendance' ? 'Attendance' : t === 'cat' ? 'CAT Marks' : 'End Sem'}
                                             </button>
                                         ))}
                                     </div>
-                                </motion.div>
-                            )}
+                                </div>
 
-                            {pdfUrl && !reportLoading && (
-                                <motion.div key="pdf" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                                    className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-xs text-slate-500 font-medium flex items-center gap-2">
-                                            <CheckCircle2 size={14} className="text-emerald-400" /> Report generated successfully
-                                        </p>
-                                        <div className="flex gap-2">
-                                            <a href={pdfUrl} download={`${activeReport}_report.pdf`}
-                                                className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-1.5">
-                                                <Download size={13} /> Download
-                                            </a>
-                                            <button onClick={() => { setPdfUrl(null); setSelectedSemester(null); }}
-                                                className="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-100 transition-all flex items-center gap-1.5 border border-slate-200/60">
-                                                <X size={13} /> Close
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <object data={pdfUrl} type="application/pdf" className="w-full h-[500px] rounded-xl border border-slate-200/60 bg-white">
-                                        <div className="flex flex-col items-center justify-center h-[500px] gap-4 bg-slate-50 rounded-xl border border-slate-200/60">
-                                            <FileText size={40} className="text-slate-400" />
-                                            <p className="text-sm text-slate-500 font-medium">PDF preview is not available in your browser</p>
-                                            <a href={pdfUrl} download={`${activeReport}_report.pdf`}
-                                                className="px-6 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg transition-all flex items-center gap-2">
-                                                <Download size={16} /> Download Report
-                                            </a>
-                                        </div>
-                                    </object>
-                                </motion.div>
-                            )}
+                                {/* Report Body */}
+                                <div className="p-4 sm:p-6 min-h-[200px] sm:min-h-[280px] relative">
+                                    <AnimatePresence mode="wait">
 
-                            {reportError && !reportLoading && (
-                                <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                    className="flex flex-col items-center justify-center h-[200px] gap-3">
-                                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                                        <AlertCircle size={22} className="text-amber-400" />
-                                    </div>
-                                    <p className="text-sm text-slate-500 text-center max-w-sm">{reportError}</p>
-                                    <button onClick={() => { setReportError(null); setActiveReport(null); }}
-                                        className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-100 transition-all border border-slate-200/60">
-                                        Try Again
-                                    </button>
-                                </motion.div>
-                            )}
+                                        {reportLoading && (
+                                            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                                className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <Loader2 className="animate-spin text-indigo-400" size={24} />
+                                                    <span className="text-sm text-slate-500 font-medium">Loading report data…</span>
+                                                </div>
+                                            </motion.div>
+                                        )}
 
-                        </AnimatePresence>
-                    </div>
-                </motion.div>
+                                        {!activeReport && !reportLoading && (
+                                            <motion.div key="empty" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                                                className="flex flex-col items-center justify-center h-[240px] text-slate-500 gap-4">
+                                                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+                                                    <BarChart3 size={36} />
+                                                </div>
+                                                <div className="text-center">
+                                                    <p className="text-sm font-semibold text-slate-500">Select a report type</p>
+                                                    <p className="text-xs text-slate-500 mt-1">Choose Attendance, CAT, or End Sem to view PDF reports</p>
+                                                </div>
+                                            </motion.div>
+                                        )}
 
+                                        {activeReport && reportSemesters.length > 0 && !pdfUrl && !reportLoading && (
+                                            <motion.div key="semesters" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                                                className="space-y-4">
+                                                <p className="text-xs text-slate-500 font-medium">Select a semester to generate the report:</p>
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                                    {(reportSemesters || []).map((s: any) => (
+                                                        <button key={s.id} onClick={() => downloadReport(s.id)}
+                                                            className={`group px-4 py-3.5 rounded-xl text-sm font-bold border transition-all duration-300 flex items-center justify-between ${selectedSemester === s.id
+                                                                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 border-indigo-500/50 text-slate-800 shadow-lg shadow-indigo-500/20'
+                                                                : 'bg-slate-50 border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:border-indigo-500/30 hover:-translate-y-0.5'
+                                                                }`}>
+                                                            <span>{s.name || `Semester ${s.number}`}</span>
+                                                            <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {pdfUrl && !reportLoading && (
+                                            <motion.div key="pdf" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                                                className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs text-slate-500 font-medium flex items-center gap-2">
+                                                        <CheckCircle2 size={14} className="text-emerald-400" /> Report generated successfully
+                                                    </p>
+                                                    <div className="flex gap-2">
+                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
+                                                            className="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all flex items-center gap-1.5">
+                                                            <ExternalLink size={14} /> Open New Tab
+                                                        </a>
+                                                        <button onClick={() => { setPdfUrl(null); setSelectedSemester(null); }}
+                                                            className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all flex items-center gap-1.5 border border-slate-200/60">
+                                                            <X size={14} /> Close
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Iframe Preview */}
+                                                <div className="w-full h-[500px] rounded-xl border border-slate-200/60 bg-slate-50 overflow-hidden relative">
+                                                    <iframe src={pdfUrl} className="w-full h-full block" title="Report Preview" />
+                                                </div>
+
+                                                <div className="flex justify-center">
+                                                    <a href={pdfUrl} download={`${activeReport}_report.pdf`}
+                                                        className="px-6 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2 active:scale-95">
+                                                        <Download size={16} /> Download PDF
+                                                    </a>
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {reportError && !reportLoading && (
+                                            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                                className="flex flex-col items-center justify-center h-[200px] gap-3">
+                                                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                                    <AlertCircle size={22} className="text-amber-400" />
+                                                </div>
+                                                <p className="text-sm text-slate-500 text-center max-w-sm">{reportError}</p>
+                                                <button onClick={() => { setReportError(null); setActiveReport(null); }}
+                                                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-100 transition-all border border-slate-200/60">
+                                                    Try Again
+                                                </button>
+                                            </motion.div>
+                                        )}
+
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.main>
 
+            {/* ═══════════════════════ BOTTOM NAV ═══════════════════════ */}
+            <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-            {/* ═══════════════════════ FOOTER ═══════════════════════ */}
-            <footer className="mt-auto border-t border-slate-100/80 bg-white/95">
+            {/* ═══════════════════════ FOOTER (Desktop only) ═══════════════════════ */}
+            <footer className="hidden md:block mt-auto border-t border-slate-100/80 bg-white/95">
                 <div className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-4 space-y-3 sm:space-y-4">
 
-                    {/* ── Sairam Branding Grid ── */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                        {/* Founder — takes 5 cols on desktop */}
-                        <div className="md:col-span-5 rounded-xl overflow-hidden bg-white p-2 shadow-sm">
-                            <Image
-                                src="/assets/sairam-founder-SphLKZaX.png"
-                                alt="MJF. Ln. Leo Muthu — Founder Chairman, Sairam Institutions"
-                                width={600}
-                                height={100}
-                                className="w-full h-full object-contain"
-                            />
-                        </div>
-                        {/* Right side: SDG + Initiatives stacked — takes 7 cols */}
-                        <div className="md:col-span-7 flex flex-col gap-3">
-                            <div className="rounded-xl overflow-hidden bg-white p-2 shadow-sm flex-1 flex items-center">
-                                <Image
-                                    src="/assets/sairam-logo2-BsAIYXw5.png"
-                                    alt="UN Sustainable Development Goals"
-                                    width={800}
-                                    height={40}
-                                    className="w-full h-auto object-contain"
-                                />
-                            </div>
-                            <div className="rounded-xl overflow-hidden bg-white p-2 shadow-sm flex-1 flex items-center">
-                                <Image
-                                    src="/assets/sairam-logo1-BVt3-ItC.png"
-                                    alt="Sairam SDG Action Program, EOMS, RAISE"
-                                    width={800}
-                                    height={40}
-                                    className="w-full h-auto object-contain"
-                                />
-                            </div>
-                        </div>
-                    </div>
+
 
                     {/* ── Credits Row ── */}
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
                         <div className="flex items-center gap-3">
-                            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-sm">
-                                <Image src="/assets/SAIRAM-ROUND-LOGO.png" alt="Sairam" width={22} height={22} className="object-contain" />
-                            </div>
+
                             <div className="flex items-center gap-1.5 text-sm text-slate-500 font-medium">
                                 <span>Built with</span>
                                 <Heart size={13} className="text-red-400 fill-red-400 animate-pulse" />
