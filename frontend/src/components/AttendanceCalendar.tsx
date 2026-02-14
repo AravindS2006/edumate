@@ -148,11 +148,11 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
     const selectedDayData = selectedDate ? attendanceMap.get(selectedDate) : null;
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {/* Calendar View */}
-            <div className="md:col-span-2 bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-6">
+            <div className="md:col-span-2 bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-4 sm:p-6">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <CalendarIcon className="text-purple-400" size={20} />
                         {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}

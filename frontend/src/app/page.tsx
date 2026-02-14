@@ -76,24 +76,7 @@ export default function Home() {
       >
         <div className="glass-card flex flex-col items-center">
 
-          {/* ── College Logo ── */}
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="mb-6"
-          >
-            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-lg shadow-indigo-100 ring-4 ring-indigo-50 overflow-hidden">
-              <Image
-                src="/assets/SAIRAM-ROUND-LOGO.png"
-                alt="Sri Sairam Institutions"
-                width={80}
-                height={80}
-                className="object-contain"
-                priority
-              />
-            </div>
-          </motion.div>
+
 
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -104,9 +87,7 @@ export default function Home() {
             <h1 className="text-3xl font-extrabold mb-1 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600">
               EduMate
             </h1>
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-[0.25em]">
-              Sri Sairam Institutions
-            </p>
+
             <p className="text-slate-500 mt-3 text-sm">Sign in to your student portal</p>
           </motion.div>
 
@@ -187,19 +168,11 @@ export default function Home() {
             transition={{ delay: 0.8, duration: 0.6 }}
             className="mt-8 w-full space-y-3"
           >
-            <div className="rounded-lg overflow-hidden bg-white p-2 border border-slate-100">
-              <Image
-                src="/assets/sairam-logo1-BVt3-ItC.png"
-                alt="Sairam Initiatives — SDG Action Program, EOMS, RAISE"
-                width={600}
-                height={50}
-                className="w-full h-auto object-contain"
-              />
-            </div>
+
 
             <div className="text-center space-y-1 pt-1">
               <p className="text-xs text-slate-400 font-semibold">Protected by AES-256 Encryption</p>
-              <p className="text-[10px] text-slate-400">© {new Date().getFullYear()} EduMate • Sairam Institutions</p>
+              <p className="text-[10px] text-slate-400">© {new Date().getFullYear()} EduMate</p>
             </div>
           </motion.div>
         </div>

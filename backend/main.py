@@ -268,6 +268,7 @@ async def get_dashboard_stats(request: Request, studtblId: str):
                         "mentor_name": raw.get("mentorName", ""),
                         "total_semesters": raw.get("totalSemesters", 0),
                         "total_years": raw.get("totalYears", 0),
+                        "pgpa": raw.get("pG_Cgpa", 0.0), # Updated key per user feedback
                         "raw_data": raw # Expose raw data for debugging
                     }
                 return stats

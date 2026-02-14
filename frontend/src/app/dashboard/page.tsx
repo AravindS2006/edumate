@@ -7,7 +7,7 @@ import {
     FileText, LogOut, AlertCircle, Loader2,
     User, TrendingUp, Award, Users,
     CheckCircle2, XCircle, Mail, Phone, Bus,
-    Download, X, ChevronRight, Sparkles, Heart
+    Download, X, ChevronRight, Sparkles, Heart, ExternalLink
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AttendanceCalendar } from '@/components/AttendanceCalendar';
@@ -31,6 +31,7 @@ interface StatsData {
     mentor_name: string;
     total_semesters: number;
     total_years: number;
+    pgpa: number;
     raw_data?: any;
 }
 
@@ -474,23 +475,26 @@ export default function Dashboard() {
                             className="space-y-3 sm:space-y-4"
                         >
                             {/* ── Greeting ── */}
-                            <motion.div variants={fadeUp} className="space-y-1">
-                                <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight text-slate-800">
-                                    {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400">{firstName}</span> 👋
+                            <motion.div variants={fadeUp} initial="hidden" animate="visible" className="space-y-1">
+                                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800">
+                                    {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">{firstName}</span> 👋
                                 </h1>
-                                <p className="text-xs sm:text-sm text-slate-500 font-medium">Here&apos;s your academic overview for today.</p>
+                                <p className="text-sm text-slate-500 font-medium">Here&apos;s your academic overview for today.</p>
                             </motion.div>
+
 
                             {/* ━━━━━━━━━━ ROW 1: Stats Cards (4 items) ━━━━━━━━━━ */}
                             <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-2 sm:gap-4">
-                                <div onClick={() => document.getElementById('attendance-section')?.scrollIntoView({ behavior: 'smooth' })} className="cursor-pointer transition-transform active:scale-95">
+                                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+                                <div onClick={() => setActiveTab('attendance')} className="cursor-pointer transition-transform active:scale-95">
                                     <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
                                         accent="cyan" badge={attendPct >= 75 ? '✓ Good' : '⚠ Low'}
                                         badgeOk={attendPct >= 75} />
                                 </div>
                                 <StatCard icon={TrendingUp} label="CGPA" value={cgpa.toFixed(2)}
                                     accent="indigo" badge="/ 10.00" />
+                                <StatCard icon={Sparkles} label="PGPA" value={String(stats?.pgpa || stats?.raw_data?.pG_Cgpa || 0)}
+                                    accent="amber" badge="Points" />
                                 <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
                                     accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
                             </motion.div>
@@ -517,7 +521,7 @@ export default function Dashboard() {
                                                 </defs>
                                             </svg>
                                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                                <span className="text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
+                                                <span className="text-2xl sm:text-3xl font-black text-slate-800 tabular-nums">{attendPct}</span>
                                                 <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold">percent</span>
                                             </div>
                                         </div>
@@ -546,16 +550,11 @@ export default function Dashboard() {
                                         {personal?.gender && <ProfileRow icon={User} label="Gender" value={personal.gender} />}
                                         {personal?.date_of_birth && <ProfileRow icon={Calendar} label="DOB" value={`${personal.date_of_birth} (Age: ${personal.age})`} />}
                                     </div>
-                                    <div className="px-5 py-3 border-t border-slate-100/80 flex items-center gap-3 bg-white">
-                                        <img src="https://student.sairam.edu.in/assets/sairam-founder-SphLKZaX.png" alt="Founder"
-                                            className="h-10 w-10 rounded-full object-cover border border-slate-200 flex-shrink-0" />
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-500 italic">&quot;Success is a journey, not a destination.&quot;</p>
-                                            <p className="text-[9px] text-slate-500">— MJF. Ln. Leo Muthu, Founder Chairman</p>
-                                        </div>
-                                    </div>
+
                                 </motion.div>
                             </div>
+
+
 
                             {/* Home tab footer branding - compact */}
                             <motion.div variants={fadeUp} className="pt-4 flex justify-center">
@@ -565,6 +564,8 @@ export default function Dashboard() {
                             </motion.div>
                         </motion.div>
                     )}
+
+
 
                     {activeTab === 'profile' && (
                         <motion.div
@@ -582,7 +583,7 @@ export default function Dashboard() {
                                         <div className="h-20 sm:h-28 relative overflow-hidden">
                                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
                                             <div className="absolute inset-0 opacity-30"
-                                                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
+                                                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
                                         </div>
                                         <div className="relative -mt-10 sm:-mt-12 flex justify-center">
                                             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
@@ -611,37 +612,15 @@ export default function Dashboard() {
                                                 {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
                                             </div>
                                         </div>
-                                        <div className="px-5 py-3 border-t border-slate-100/80 flex items-center gap-3 bg-white">
-                                            <img src="https://student.sairam.edu.in/assets/sairam-founder-SphLKZaX.png" alt="Founder"
-                                                className="h-10 w-10 rounded-full object-cover border border-slate-200 flex-shrink-0" />
-                                            <div>
-                                                <p className="text-[10px] font-bold text-slate-500 italic">&quot;Success is a journey, not a destination.&quot;</p>
-                                                <p className="text-[9px] text-slate-500">— MJF. Ln. Leo Muthu, Founder Chairman</p>
-                                            </div>
-                                        </div>
+
                                     </div>
                                 </motion.div>
                             )}
-
-                            {/* ── Debug Section ── */}
-                            {stats?.raw_data && (
-                                <motion.div variants={fadeUp} className="mt-8 p-4 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
-                                    <details className="group">
-                                        <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-500 uppercase tracking-widest list-none">
-                                            <span className="transition group-open:rotate-90">▶</span> Debug: Raw Backend Data
-                                        </summary>
-                                        <pre className="mt-4 text-[10px] text-slate-600 font-mono overflow-auto max-h-60 bg-white p-3 rounded-lg border border-slate-200">
-                                            {JSON.stringify(stats.raw_data, null, 2)}
-                                        </pre>
-                                    </details>
-                                </motion.div>
-                            )}
-
-                            {/* ━━━━━━━━━━ Academic History + Family ━━━━━━━━━━ */}
+                            {/* ── Academic History + Family ── */}
                             {
-                                (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) && (
+                                (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) ? (
                                     <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                                        className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                        className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
 
                                         {acadPct && acadPct.records && acadPct.records.length > 0 && (
                                             <motion.div variants={fadeUp}
@@ -683,8 +662,33 @@ export default function Dashboard() {
                                             </motion.div>
                                         )}
                                     </motion.div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                                        <BookOpen size={48} className="mb-4 opacity-50" />
+                                        <p>No additional information available.</p>
+                                    </div>
                                 )
                             }
+
+                            {/* ── Debug Section ── */}
+                            {stats?.raw_data && (
+                                <motion.div variants={fadeUp} className="mt-4 mb-4 p-4 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
+                                    <details className="group">
+                                        <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-500 uppercase tracking-widest list-none">
+                                            <span className="transition group-open:rotate-90">▶</span> Debug: Raw Backend Data
+                                        </summary>
+                                        <pre className="mt-4 text-[10px] text-slate-600 font-mono overflow-auto max-h-60 bg-white p-3 rounded-lg border border-slate-200">
+                                            {JSON.stringify(stats.raw_data, null, 2)}
+                                        </pre>
+                                    </details>
+                                </motion.div>
+                            )}
+
+                            <motion.div variants={fadeUp} className="pt-4 flex justify-center">
+                                <div className="flex items-center gap-2 text-slate-400 text-xs">
+                                    <span>Built with</span><Heart size={12} className="text-red-400 fill-red-400" /><span>by Sairamite</span>
+                                </div>
+                            </motion.div>
                         </motion.div>
                     )}
 
@@ -705,17 +709,7 @@ export default function Dashboard() {
                                 </div>
                             )}
                             {/* ── Attendance Calendar Section ── */}
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-1.5 bg-purple-500/10 rounded-lg text-purple-400">
-                                        <Calendar size={20} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-base font-bold text-slate-800">Attendance Tracker</h2>
-                                        <p className="text-[10px] text-slate-500">Daily status & leave record</p>
-                                    </div>
-                                </div>
-
+                            <div className="space-y-2">
                                 <AttendanceCalendar
                                     dailyData={attendanceDaily}
                                     leaveData={leaveData}
@@ -829,26 +823,28 @@ export default function Dashboard() {
                                                         <CheckCircle2 size={14} className="text-emerald-400" /> Report generated successfully
                                                     </p>
                                                     <div className="flex gap-2">
-                                                        <a href={pdfUrl} download={`${activeReport}_report.pdf`}
-                                                            className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-1.5">
-                                                            <Download size={13} /> Download
+                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
+                                                            className="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all flex items-center gap-1.5">
+                                                            <ExternalLink size={14} /> Open New Tab
                                                         </a>
                                                         <button onClick={() => { setPdfUrl(null); setSelectedSemester(null); }}
-                                                            className="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-100 transition-all flex items-center gap-1.5 border border-slate-200/60">
-                                                            <X size={13} /> Close
+                                                            className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all flex items-center gap-1.5 border border-slate-200/60">
+                                                            <X size={14} /> Close
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <object data={pdfUrl} type="application/pdf" className="w-full h-[500px] rounded-xl border border-slate-200/60 bg-white">
-                                                    <div className="flex flex-col items-center justify-center h-[500px] gap-4 bg-slate-50 rounded-xl border border-slate-200/60">
-                                                        <FileText size={40} className="text-slate-400" />
-                                                        <p className="text-sm text-slate-500 font-medium">PDF preview is not available in your browser</p>
-                                                        <a href={pdfUrl} download={`${activeReport}_report.pdf`}
-                                                            className="px-6 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg transition-all flex items-center gap-2">
-                                                            <Download size={16} /> Download Report
-                                                        </a>
-                                                    </div>
-                                                </object>
+
+                                                {/* Iframe Preview */}
+                                                <div className="w-full h-[500px] rounded-xl border border-slate-200/60 bg-slate-50 overflow-hidden relative">
+                                                    <iframe src={pdfUrl} className="w-full h-full block" title="Report Preview" />
+                                                </div>
+
+                                                <div className="flex justify-center">
+                                                    <a href={pdfUrl} download={`${activeReport}_report.pdf`}
+                                                        className="px-6 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2 active:scale-95">
+                                                        <Download size={16} /> Download PDF
+                                                    </a>
+                                                </div>
                                             </motion.div>
                                         )}
 
@@ -881,47 +877,12 @@ export default function Dashboard() {
             <footer className="hidden md:block mt-auto border-t border-slate-100/80 bg-white/95">
                 <div className="max-w-[1400px] mx-auto px-3 sm:px-8 py-3 sm:py-4 space-y-3 sm:space-y-4">
 
-                    {/* ── Sairam Branding Grid ── */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                        {/* Founder — takes 5 cols on desktop */}
-                        <div className="md:col-span-5 rounded-xl overflow-hidden bg-white p-2 shadow-sm">
-                            <Image
-                                src="/assets/sairam-founder-SphLKZaX.png"
-                                alt="MJF. Ln. Leo Muthu — Founder Chairman, Sairam Institutions"
-                                width={600}
-                                height={100}
-                                className="w-full h-full object-contain"
-                            />
-                        </div>
-                        {/* Right side: SDG + Initiatives stacked — takes 7 cols */}
-                        <div className="md:col-span-7 flex flex-col gap-3">
-                            <div className="rounded-xl overflow-hidden bg-white p-2 shadow-sm flex-1 flex items-center">
-                                <Image
-                                    src="/assets/sairam-logo2-BsAIYXw5.png"
-                                    alt="UN Sustainable Development Goals"
-                                    width={800}
-                                    height={40}
-                                    className="w-full h-auto object-contain"
-                                />
-                            </div>
-                            <div className="rounded-xl overflow-hidden bg-white p-2 shadow-sm flex-1 flex items-center">
-                                <Image
-                                    src="/assets/sairam-logo1-BVt3-ItC.png"
-                                    alt="Sairam SDG Action Program, EOMS, RAISE"
-                                    width={800}
-                                    height={40}
-                                    className="w-full h-auto object-contain"
-                                />
-                            </div>
-                        </div>
-                    </div>
+
 
                     {/* ── Credits Row ── */}
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
                         <div className="flex items-center gap-3">
-                            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-sm">
-                                <Image src="/assets/SAIRAM-ROUND-LOGO.png" alt="Sairam" width={22} height={22} className="object-contain" />
-                            </div>
+
                             <div className="flex items-center gap-1.5 text-sm text-slate-500 font-medium">
                                 <span>Built with</span>
                                 <Heart size={13} className="text-red-400 fill-red-400 animate-pulse" />

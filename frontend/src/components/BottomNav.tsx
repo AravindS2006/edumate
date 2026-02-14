@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Home, User, Calendar, FileText } from 'lucide-react';
+import { Home, User, Calendar, FileText, BookOpen } from 'lucide-react';
 
 export type NavTab = 'home' | 'profile' | 'attendance' | 'reports';
 
@@ -50,9 +50,8 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
                 />
               )}
               <span
-                className={`relative z-10 flex items-center gap-2 ${
-                  isActive ? 'text-white' : 'text-slate-500'
-                }`}
+                className={`relative z-10 flex items-center gap-2 ${isActive ? 'text-white' : 'text-slate-500'
+                  }`}
               >
                 <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                 <span className="hidden sm:inline">{tab.label}</span>
