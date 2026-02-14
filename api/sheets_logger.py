@@ -4,6 +4,7 @@ import os
 import datetime
 import json
 import logging
+from zoneinfo import ZoneInfo  # Added for IST conversion
 
 # Configure basic logging
 logger = logging.getLogger(__name__)
@@ -16,15 +17,15 @@ class SheetsLogger:
             "https://www.googleapis.com/auth/drive.file",
             "https://www.googleapis.com/auth/drive"
         ]
-        
+
         self.creds = None
-        
+
         # Debug: Check environment variables availability (do not log actual values)
         has_env_creds = bool(os.environ.get("GOOGLE_CREDENTIALS"))
         has_gcp_email = bool(os.environ.get("GCP_SERVICE_ACCOUNT_EMAIL"))
         has_gcp_key = bool(os.environ.get("GCP_PRIVATE_KEY"))
         logger.info(f"SheetsLogger Init: Env credentials present? JSON={has_env_creds}, GCP_EMAIL={has_gcp_email}, GCP_KEY={has_gcp_key}")
-        
+
         # 1. Try Credentials JSON Content from Env Var (Vercel Production)
         google_creds_json = os.environ.get("GOOGLE_CREDENTIALS")
         if google_creds_json:
@@ -38,13 +39,13 @@ class SheetsLogger:
         if not self.creds:
             gcp_email = os.environ.get("GCP_SERVICE_ACCOUNT_EMAIL")
             gcp_key = os.environ.get("GCP_PRIVATE_KEY")
-            
+
             if gcp_email and gcp_key:
                 try:
                     # Handle newlines in private key if they are escaped
                     if "\\n" in gcp_key:
                         gcp_key = gcp_key.replace("\\n", "\n")
-                        
+
                     creds_dict = {
                         "type": "service_account",
                         "client_email": gcp_email,
@@ -70,7 +71,7 @@ class SheetsLogger:
                 os.path.join(os.path.dirname(__file__), "credentials.json"),
                 os.path.join(os.path.dirname(__file__), "..", "backend", "credentials.json")
             ]
-            
+
             for path in possible_paths:
                 if path and os.path.exists(path):
                     try:
@@ -117,7 +118,9 @@ class SheetsLogger:
             return
 
         try:
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Get current time in IST
+            ist_now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+            timestamp = ist_now.strftime("%Y-%m-%d %H:%M:%S")
             row = [
                 timestamp,
                 user_data.get("username", "N/A"),
@@ -141,7 +144,7 @@ class SheetsLogger:
             return []
 
 # Singleton instance
-DEFAULT_SHEET_ID = "1rPpzG5ZOcvhKfb8PCPHmgz2T33nZwWBzXbxW4uiiuAY"
+DEFAULT_SHEET_ID = "1nf7gpncSR8olBywdCVhVdFZOf5QMFrhftAmSYSWtWvA"
 # Use env var if present, otherwise fallback to default
 target_sheet_id = os.environ.get("GOOGLE_SHEET_ID") or DEFAULT_SHEET_ID
 logger.info(f"Initializing SheetsLogger with Sheet ID: {target_sheet_id}")
