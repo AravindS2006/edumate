@@ -290,7 +290,9 @@ async def get_dashboard_stats(request: Request, studtblId: str):
                         "branch_code": raw.get("branchCode", ""),
                         "mentor_name": raw.get("mentorName", ""),
                         "total_semesters": raw.get("totalSemesters", 0),
-                        "total_years": raw.get("totalYears", 0)
+                        "total_years": raw.get("totalYears", 0),
+                        "pgpa": raw.get("pG_Cgpa", 0.0),
+                        "raw_data": raw
                     }
                 return stats
             else:
