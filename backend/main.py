@@ -175,6 +175,19 @@ def fix_id(studtblId: str) -> str:
     """Ensure + and = are not corrupted by URL encoding."""
     return studtblId.replace(" ", "+")
 
+
+def build_attendance_params(request: Request) -> dict:
+    """Build upstream params for attendance endpoints. SEC and SIT .NET APIs expect PascalCase."""
+    q = dict(request.query_params)
+    return {
+        "studtblId": fix_id(q.get("studtblId", "")),
+        "AcademicYearId": q.get("academicYearId", q.get("AcademicYearId", "14")),
+        "BranchId": q.get("branchId", q.get("BranchId", "2")),
+        "SemesterId": q.get("semesterId", q.get("SemesterId", "6")),
+        "YearOfStudyId": q.get("yearOfStudyId", q.get("YearOfStudyId", "3")),
+        "SectionId": q.get("sectionId", q.get("SectionId", "1")),
+    }
+
 # ============================================================
 #  PROFILE IMAGE
 # ============================================================
@@ -242,6 +255,7 @@ async def get_dashboard_stats(request: Request, studtblId: str):
                 
                 if "data" in json_data and isinstance(json_data["data"], list) and len(json_data["data"]) > 0:
                     raw = json_data["data"][0]
+                    print(f"[DashboardDebug] Raw Data: {json.dumps(raw, indent=2)}")
                     stats = {
                         "attendance_percentage": raw.get("attendancePercentage", 0),
                         "cgpa": raw.get("uG_Cgpa", 0.0),
@@ -253,7 +267,8 @@ async def get_dashboard_stats(request: Request, studtblId: str):
                         "branch_code": raw.get("branchCode", ""),
                         "mentor_name": raw.get("mentorName", ""),
                         "total_semesters": raw.get("totalSemesters", 0),
-                        "total_years": raw.get("totalYears", 0)
+                        "total_years": raw.get("totalYears", 0),
+                        "raw_data": raw # Expose raw data for debugging
                     }
                 return stats
             else:
@@ -264,13 +279,11 @@ async def get_dashboard_stats(request: Request, studtblId: str):
     return {"error": "Failed to fetch dashboard data"}
 
 # ============================================================
-#  ACADEMIC DETAILS (Fixed! Using correct endpoint)
+#  ACADEMIC DETAILS (sem, branch, hostel, etc.)
 # ============================================================
 @app.get("/api/student/academic")
 async def get_academic_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
-    # HAR confirms this endpoint works! Returns batch year, university reg, etc.
-    # HAR confirms this endpoint works! Returns batch year, university reg, etc.
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentAcademicDetails"
     
@@ -280,29 +293,29 @@ async def get_academic_details(request: Request, studtblId: str):
             print(f"[Academic] ID: '{studtblId}' | Status: {resp.status_code}")
             
             if resp.status_code == 200:
-                data = resp.json()
-                if "data" in data and isinstance(data["data"], list) and len(data["data"]) > 0:
-                    raw = data["data"][0]
+                json_data = resp.json()
+                print(f"[AcademicDebug] Full Data: {json.dumps(json_data, indent=2)}")
+                if "data" in json_data and isinstance(json_data["data"], list) and len(json_data["data"]) > 0:
+                    raw = json_data["data"][0]
                     return {
-                        "dept": raw.get("studentDepartment", "Unknown"),
-                        "semester": raw.get("currentSemsterId", 0),
+                        "dept": raw.get("studentDepartment") or raw.get("programName", ""),
+                        "semester": raw.get("currentSemsterId") or raw.get("semesterNo", 0),
                         "semester_name": raw.get("semesterName", ""),
                         "semester_type": raw.get("semesterType", ""),
-                        "section": "N/A",  # Not in this endpoint, comes from Dashboard
-                        "batch": raw.get("academicBatchYear", ""),
+                        "section": raw.get("sectionName", ""), # Not always available in this endpoint
+                        "batch": raw.get("academicBatchYear") or raw.get("batchName", ""),
                         "admission_mode": raw.get("admissionMode", ""),
-                        "university_reg_no": raw.get("universityRegNo", ""),
+                        "university_reg_no": raw.get("universityRegNo") or raw.get("universityRegisterNo", ""),
                         "mentor_name": raw.get("mentorName", ""),
-                        "hostel": raw.get("hostel", False),
-                        "bus_code": raw.get("busCode", ""),
-                        "current_academic_year": raw.get("currentAcademicYear", ""),
-                        "programme_id": raw.get("programmeId", 0),
-                        # IDs needed for other endpoints
-                        "branch_id": raw.get("branchId", 0),
-                        "year_of_study_id": raw.get("yearOfStudyId", 0),
-                        "section_id": raw.get("sectionId", 0),
-                        "academic_year_id": raw.get("academicYearId", 0),
-                        "academic_batch_id": raw.get("academicBatchId", 0)
+                        "hostel": raw.get("hostel") or raw.get("isHosteller", False),
+                        "bus_code": raw.get("busCode") or raw.get("busRouteCode", ""),
+                        "current_academic_year": raw.get("currentAcademicYear") or raw.get("academicYear", ""),
+                        # Raw IDs for other API calls
+                        "branch_id": raw.get("branchId"),
+                        "year_of_study_id": raw.get("yearOfStudyId"),
+                        "section_id": raw.get("sectionId"),
+                        "academic_year_id": raw.get("academicYearId"),
+                        "raw_data": raw
                     }
     except Exception as e:
         print(f"[Academic] Exception: {e}")
@@ -358,6 +371,9 @@ async def get_personal_details(request: Request, studtblId: str):
 # ============================================================
 #  EXAM STATUS (for arrears / eligibility)
 # ============================================================
+# ============================================================
+#  EXAM STATUS (for arrears / eligibility)
+# ============================================================
 @app.get("/api/student/exam-status")
 async def get_exam_status(request: Request, studtblId: str, 
                           academicYearId: int = 14, yearOfStudyId: int = 3,
@@ -383,25 +399,54 @@ async def get_exam_status(request: Request, studtblId: str,
             
             if resp.status_code == 200:
                 json_data = resp.json()
+                print(f"[ExamStatus] Raw Data Keys: {json_data.keys()}")
+                
+                raw = {}
                 if "data" in json_data and json_data["data"]:
                     raw = json_data["data"]
-                    # Debug: Print all keys to find arrears info
-                    print(f"[ExamStatus] Keys: {list(raw.keys())}")
-                    print(f"[ExamStatus] Arrear info? 'arrear': {raw.get('arrear')}, 'history': {raw.get('historyOfArrears')}, 'totalArrears': {raw.get('totalArrears')}")
+                
+                # Check if we have arrears data. If not, and we are not in Sem 1, try previous semester.
+                has_arrear_info = raw.get("historyOfArrears") is not None or raw.get("totalArrears") is not None
+                
+                if not has_arrear_info and semesterId > 1:
+                    print(f"[ExamStatus] No arrears info for Sem {semesterId}. Trying Sem {semesterId - 1}...")
+                    # Determine previous sem type
+                    prev_sem_type = "Odd" if semesterType == "Even" else "Even"
+                    params["SemesterId"] = semesterId - 1
+                    params["presemesterType"] = prev_sem_type
                     
-                    return {
-                        "attendance_eligible": raw.get("isAttendanceEligible", False),
-                        "fees_eligible": raw.get("isFeesEligible", False),
-                        "current_status": raw.get("currentStatus", ""),
-                        "total_fees": raw.get("fees", 0),
-                        "paid_online": raw.get("onlinePaymentFees", 0),
-                        "previous_due": raw.get("previousFeeDue", 0),
-                        "attendance_pct": raw.get("attendancePercentage", 0),
-                        "od_pct": raw.get("odPercentage", 0),
-                        # Potential new fields
-                        "arrears_current": raw.get("noOfArrears", 0), 
-                        "arrears_history": raw.get("historyOfArrears", 0)
-                    }
+                    # Retry fetch
+                    resp_prev = await client.get(upstream_url, params=params, headers=headers)
+                    if resp_prev.status_code == 200:
+                        json_prev = resp_prev.json()
+                        if "data" in json_prev and json_prev["data"]:
+                            print(f"[ExamStatus] Found data in previous semester {semesterId - 1}!")
+                            raw_prev = json_prev["data"]
+                            # Merge relevant fields if missing in current (prefer current for fees/attendance, prev for results)
+                            if raw.get("historyOfArrears") is None: raw["historyOfArrears"] = raw_prev.get("historyOfArrears")
+                            if raw.get("totalArrears") is None: raw["totalArrears"] = raw_prev.get("totalArrears")
+                            if raw.get("noOfArrears") is None: raw["noOfArrears"] = raw_prev.get("noOfArrears")
+                            raw["_debug_from_sem"] = semesterId - 1
+
+                # Debug: Print all keys to find arrears info
+                print(f"[ExamStatus] Data Keys: {list(raw.keys())}")
+                print(f"[ExamStatus] Arrear info? 'arrear': {raw.get('arrear')}, 'history': {raw.get('historyOfArrears')}, 'totalArrears': {raw.get('totalArrears')}")
+                print(f"[ExamStatusDebug] Full Data: {json.dumps(raw, indent=2)}")
+                
+                return {
+                    "attendance_eligible": raw.get("isAttendanceEligible", False),
+                    "fees_eligible": raw.get("isFeesEligible", False),
+                    "current_status": raw.get("currentStatus", ""),
+                    "total_fees": raw.get("fees", 0),
+                    "paid_online": raw.get("onlinePaymentFees", 0),
+                    "previous_due": raw.get("previousFeeDue", 0),
+                    "attendance_pct": raw.get("attendancePercentage", 0),
+                    "od_pct": raw.get("odPercentage", 0),
+                    # Potential new fields
+                    "arrears_current": raw.get("noOfArrears", 0), 
+                    "arrears_history": raw.get("historyOfArrears", 0),
+                    "raw_data": raw
+                }
     except Exception as e:
         print(f"[ExamStatus] Exception: {e}")
     
@@ -423,6 +468,7 @@ async def get_academic_percentage(request: Request, studtblId: str):
             
             if resp.status_code == 200:
                 json_data = resp.json()
+                print(f"[AcadPctDebug] Full Response: {json.dumps(json_data, indent=2)}")
                 if "data" in json_data and isinstance(json_data["data"], list):
                     return {
                         "records": [
@@ -455,6 +501,7 @@ async def get_parent_details(request: Request, studtblId: str):
                 json_data = resp.json()
                 if "data" in json_data and json_data["data"]:
                     raw = json_data["data"]
+                    print(f"[ParentDebug] keys: {list(raw.keys())}")
                     return {
                         "father_name": raw.get("fatherName", ""),
                         "father_occupation": raw.get("fatherOccupation", ""),
@@ -647,124 +694,130 @@ async def get_report(request: Request, studtblId: str, type: str):
 #  ATTENDANCE DETAILS (Course, Daily, Overall, Leave)
 # ============================================================
 
+def _extract_attendance_data(json_data, inst_id: str = "SEC"):
+    """Extract list from SEC (raw list) or SIT ({success, data}) response."""
+    if isinstance(json_data, list):
+        return json_data
+    if isinstance(json_data, dict) and "data" in json_data:
+        d = json_data["data"]
+        return d if isinstance(d, list) else [d] if d else []
+    return []
+
+
 @app.get("/api/attendance/course-detail")
 async def get_attendance_course_detail(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceCourseDetail"
-    
-    # Forward all incoming query params
-    params = dict(request.query_params)
-    params["studtblId"] = studtblId
-    
-    # Fill SEC defaults if absolutely missing
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    params = build_attendance_params(request)
+    params["studtblId"] = fix_id(studtblId)
+    inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttCourse] {inst_id} status={resp.status_code}")
             if resp.status_code == 200:
                 json_data = resp.json()
-                
-                # Normalize SIT keys if institution is SIT or structure matches
-                inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
-                items = json_data.get("data") if isinstance(json_data, dict) else json_data
-                
-                if isinstance(items, list):
-                    # Check if it looks like SIT data OR inst_id is SIT
-                    # SIT uses 'subjectCode' or returns raw values without the 'data' key
-                    is_sit = inst_id == "SIT" or (len(items) > 0 and ("subjectCode" in items[0] or "attendancePercentage" in items[0]))
-                    
+                items = _extract_attendance_data(json_data, inst_id)
+
+                if isinstance(items, list) and len(items) > 0:
+                    is_sit = inst_id == "SIT" or ("courseCode" in items[0] and "attendancePercentage" in items[0]) or "subjectCode" in items[0] or "courseName" in items[0]
                     if is_sit:
-                        normalized_data = []
-                        for item in items:
-                            normalized_data.append({
-                                "courseCode": item.get("subjectCode") or item.get("courseCode"),
-                                "courseName": item.get("subjectName") or item.get("courseName"),
-                                "attendancePercentage": item.get("attendancePercentage") or item.get("percentage") or item.get("p_Percentage") or 0,
-                                "courseId": item.get("courseId") or item.get("id"),
-                                "id": item.get("id") or item.get("courseId")
-                            })
-                        return {"success": True, "data": normalized_data}
-                    else: # If not SIT-like data, but it's a list, wrap it
-                        return {"success": True, "data": items}
-                
-                # If it's not a list, return the original json_data
-                return json_data
+                        normalized = [{
+                            "courseCode": item.get("subjectCode") or item.get("courseCode", ""),
+                            "courseName": item.get("subjectName") or item.get("courseName", ""),
+                            "attendancePercentage": item.get("attendancePercentage") or item.get("percentage") or item.get("p_Percentage") or 0,
+                            "courseId": item.get("courseId") or item.get("id"),
+                            "id": item.get("id") or item.get("courseId")
+                        } for item in items]
+                        return {"success": True, "data": normalized}
+                    return {"success": True, "data": items}
+                elif isinstance(items, list):
+                    return {"success": True, "data": items}
+                return json_data if isinstance(json_data, dict) else {"success": True, "data": []}
     except Exception as e:
         print(f"[AttCourse] Exception: {e}")
     return {"error": "Failed to fetch course attendance"}
 
 @app.get("/api/attendance/daily-detail")
 async def get_attendance_daily_detail(request: Request, studtblId: str):
-    studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
-    upstream_url = f"{base_url}/Student/GetStudentDailyAttedanceDetail"
-    
-    params = dict(request.query_params)
-    params["studtblId"] = studtblId
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    params = build_attendance_params(request)
+    params["studtblId"] = fix_id(studtblId)
+    inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
+
+    # SIT and SEC use same endpoint; try both spellings (Attedance typo vs Attendance)
+    endpoints = [
+        f"{base_url}/Student/GetStudentDailyAttedanceDetail",
+        f"{base_url}/Student/GetStudentDailyAttendanceDetail",
+    ]
 
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(upstream_url, params=params, headers=headers)
-            if resp.status_code == 200:
-                json_data = resp.json()
-                if isinstance(json_data, list):
-                    return {"success": True, "data": json_data}
-                return json_data
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            for upstream_url in endpoints:
+                resp = await client.get(upstream_url, params=params, headers=headers)
+                print(f"[AttDaily] {inst_id} {upstream_url.split('/')[-1]} status={resp.status_code}")
+                if resp.status_code == 200:
+                    json_data = resp.json()
+                    data = _extract_attendance_data(json_data, inst_id)
+                    
+                    # Calculate ODs for debugging
+                    od_count = 0
+                    if isinstance(data, list):
+                        print(f"[AttDaily] Data Length: {len(data)}")
+                        if len(data) > 0:
+                            print(f"[AttDaily] Sample Item: {json.dumps(data[0], indent=2)}")
+                        
+                        for item in data:
+                            # Check known fields for OD status
+                            status = str(item.get("attendanceStatus") or item.get("presentAbsent") or "").upper()
+                            if "OD" in status or "DUTY" in status:
+                                od_count += 1
+                        print(f"[AttDaily] Calculated OD Count from Daily Records: {od_count}")
+                    else:
+                         print(f"[AttDaily] Data is not a list! Type: {type(data)}")
+                    
+                    return {"success": True, "data": data}
     except Exception as e:
         print(f"[AttDaily] Exception: {e}")
     return {"error": "Failed to fetch daily attendance"}
 
 @app.get("/api/attendance/overall-detail")
 async def get_attendance_overall_detail(request: Request, studtblId: str):
-    studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceOverAllDetail"
-    
-    params = dict(request.query_params)
-    params["studtblId"] = studtblId
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    params = build_attendance_params(request)
+    params["studtblId"] = fix_id(studtblId)
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
-                if isinstance(json_data, list):
-                    return {"success": True, "data": json_data}
-                return json_data
+                print(f"[AttOverallDebug] Full Data: {json.dumps(json_data, indent=2)}")
+                data = _extract_attendance_data(json_data)
+                return {"success": True, "data": data, "raw_data": json_data}
     except Exception as e:
         print(f"[AttOverall] Exception: {e}")
     return {"error": "Failed to fetch overall attendance"}
 
 @app.get("/api/attendance/leave-status")
 async def get_leave_status(request: Request, studtblId: str):
-    studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetLeaveStatusByStudent"
-    
-    params = dict(request.query_params)
-    params["studtblId"] = studtblId
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    params = build_attendance_params(request)
+    params["studtblId"] = fix_id(studtblId)
+    inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttLeave] {inst_id} status={resp.status_code}")
             if resp.status_code == 200:
                 json_data = resp.json()
-                if isinstance(json_data, list):
-                    return {"success": True, "data": json_data}
-                return json_data
+                data = _extract_attendance_data(json_data, inst_id)
+                return {"success": True, "data": data}
     except Exception as e:
         print(f"[AttLeave] Exception: {e}")
     return {"error": "Failed to fetch leave status"}

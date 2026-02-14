@@ -18,8 +18,8 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const apiBase = process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : '';
-      const res = await fetch(`${apiBase}/api/login`, {
+      // Use relative URL so Next.js rewrites proxy to backend (avoids CORS, works with proxy)
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,7 +60,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
       {/* Subtle background decorations */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-20%] left-[-15%] w-[50%] h-[50%] bg-indigo-100/60 rounded-full blur-[120px]"></div>

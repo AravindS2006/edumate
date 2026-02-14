@@ -191,6 +191,30 @@ def fix_id(studtblId: str) -> str:
     """Ensure + and = are not corrupted by URL encoding."""
     return studtblId.replace(" ", "+")
 
+
+def build_attendance_params(request: Request) -> dict:
+    """Build upstream params for attendance endpoints. SEC and SIT .NET APIs expect PascalCase."""
+    q = dict(request.query_params)
+    return {
+        "studtblId": fix_id(q.get("studtblId", "")),
+        "AcademicYearId": q.get("academicYearId", q.get("AcademicYearId", "14")),
+        "BranchId": q.get("branchId", q.get("BranchId", "2")),
+        "SemesterId": q.get("semesterId", q.get("SemesterId", "6")),
+        "YearOfStudyId": q.get("yearOfStudyId", q.get("YearOfStudyId", "3")),
+        "SectionId": q.get("sectionId", q.get("SectionId", "1")),
+    }
+
+
+def _extract_attendance_data(json_data, inst_id: str = "SEC"):
+    """Extract list from SEC (raw list) or SIT ({success, data}) response."""
+    if isinstance(json_data, list):
+        return json_data
+    if isinstance(json_data, dict) and "data" in json_data:
+        d = json_data["data"]
+        return d if isinstance(d, list) else [d] if d else []
+    return []
+
+
 # ============================================================
 #  PROFILE IMAGE
 # ============================================================
@@ -294,9 +318,10 @@ async def get_academic_details(request: Request, studtblId: str):
                 data = resp.json()
                 if "data" in data and isinstance(data["data"], list) and len(data["data"]) > 0:
                     raw = data["data"][0]
+                    semester = raw.get("currentSemsterId") or raw.get("semester") or 0
                     return {
-                        "dept": raw.get("studentDepartment", "Unknown"),
-                        "semester": raw.get("currentSemsterId", 0),
+                        "dept": raw.get("studentDepartment") or raw.get("dept", "Unknown"),
+                        "semester": semester,
                         "semester_name": raw.get("semesterName", ""),
                         "semester_type": raw.get("semesterType", ""),
                         "section": "N/A",
@@ -308,11 +333,11 @@ async def get_academic_details(request: Request, studtblId: str):
                         "bus_code": raw.get("busCode", ""),
                         "current_academic_year": raw.get("currentAcademicYear", ""),
                         "programme_id": raw.get("programmeId", 0),
-                        "branch_id": raw.get("branchId", 0),
-                        "year_of_study_id": raw.get("yearOfStudyId", 0),
-                        "section_id": raw.get("sectionId", 0),
-                        "academic_year_id": raw.get("academicYearId", 0),
-                        "academic_batch_id": raw.get("academicBatchId", 0)
+                        "branch_id": raw.get("branchId") or raw.get("branch_id", 0),
+                        "year_of_study_id": raw.get("yearOfStudyId") or raw.get("year_of_study_id", 0),
+                        "section_id": raw.get("sectionId") or raw.get("section_id", 0),
+                        "academic_year_id": raw.get("academicYearId") or raw.get("academic_year_id", 0),
+                        "academic_batch_id": raw.get("academicBatchId") or raw.get("academic_batch_id", 0)
                     }
     except Exception as e:
         print(f"[Academic] Exception: {e}")
@@ -616,118 +641,96 @@ async def get_attendance_course_detail(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceCourseDetail"
-    
-    # Forward all incoming query params
-    params = dict(request.query_params)
+    params = build_attendance_params(request)
     params["studtblId"] = studtblId
-    
-    # Fill SEC defaults if absolutely missing
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttCourse] {inst_id} status={resp.status_code}")
             if resp.status_code == 200:
                 json_data = resp.json()
-                
-                # Normalize SIT keys if institution is SIT or structure matches
-                inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
-                items = json_data.get("data") if isinstance(json_data, dict) else json_data
-                
-                if isinstance(items, list):
-                    # Check if it looks like SIT data OR inst_id is SIT
-                    # SIT uses 'subjectCode' or returns raw values without the 'data' key
-                    is_sit = inst_id == "SIT" or (len(items) > 0 and ("subjectCode" in items[0] or "attendancePercentage" in items[0]))
-                    
+                items = _extract_attendance_data(json_data, inst_id)
+
+                if isinstance(items, list) and len(items) > 0:
+                    is_sit = inst_id == "SIT" or ("courseCode" in items[0] and "attendancePercentage" in items[0]) or "subjectCode" in items[0] or "courseName" in items[0]
                     if is_sit:
-                        normalized_data = []
-                        for item in items:
-                            normalized_data.append({
-                                "courseCode": item.get("subjectCode") or item.get("courseCode"),
-                                "courseName": item.get("subjectName") or item.get("courseName"),
-                                "attendancePercentage": item.get("attendancePercentage") or item.get("percentage") or item.get("p_Percentage") or 0,
-                                "courseId": item.get("courseId") or item.get("id"),
-                                "id": item.get("id") or item.get("courseId")
-                            })
-                        return {"success": True, "data": normalized_data}
-                    else: # If not SIT-like data, but it's a list, wrap it
-                        return {"success": True, "data": items}
-                
-                return json_data
+                        normalized = [{
+                            "courseCode": item.get("subjectCode") or item.get("courseCode", ""),
+                            "courseName": item.get("subjectName") or item.get("courseName", ""),
+                            "attendancePercentage": item.get("attendancePercentage") or item.get("percentage") or item.get("p_Percentage") or 0,
+                            "courseId": item.get("courseId") or item.get("id"),
+                            "id": item.get("id") or item.get("courseId")
+                        } for item in items]
+                        return {"success": True, "data": normalized}
+                    return {"success": True, "data": items}
+                elif isinstance(items, list):
+                    return {"success": True, "data": items}
+                return json_data if isinstance(json_data, dict) else {"success": True, "data": []}
     except Exception as e:
         print(f"[AttCourse] Exception: {e}")
     return {"error": "Failed to fetch course attendance"}
 
 @app.get("/api/attendance/daily-detail")
 async def get_attendance_daily_detail(request: Request, studtblId: str):
-    studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
-    upstream_url = f"{base_url}/Student/GetStudentDailyAttedanceDetail"
-    
-    params = dict(request.query_params)
-    params["studtblId"] = studtblId
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    params = build_attendance_params(request)
+    params["studtblId"] = fix_id(studtblId)
+    inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
+
+    endpoints = [
+        f"{base_url}/Student/GetStudentDailyAttedanceDetail",
+        f"{base_url}/Student/GetStudentDailyAttendanceDetail",
+    ]
 
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(upstream_url, params=params, headers=headers)
-            if resp.status_code == 200:
-                json_data = resp.json()
-                if isinstance(json_data, list):
-                    return {"success": True, "data": json_data}
-                return json_data
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            for upstream_url in endpoints:
+                resp = await client.get(upstream_url, params=params, headers=headers)
+                print(f"[AttDaily] {inst_id} {upstream_url.split('/')[-1]} status={resp.status_code}")
+                if resp.status_code == 200:
+                    json_data = resp.json()
+                    data = _extract_attendance_data(json_data, inst_id)
+                    return {"success": True, "data": data}
     except Exception as e:
         print(f"[AttDaily] Exception: {e}")
     return {"error": "Failed to fetch daily attendance"}
 
 @app.get("/api/attendance/overall-detail")
 async def get_attendance_overall_detail(request: Request, studtblId: str):
-    studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceOverAllDetail"
-    
-    params = dict(request.query_params)
-    params["studtblId"] = studtblId
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    params = build_attendance_params(request)
+    params["studtblId"] = fix_id(studtblId)
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
-                if isinstance(json_data, list):
-                    return {"success": True, "data": json_data}
-                return json_data
+                data = _extract_attendance_data(json_data)
+                return {"success": True, "data": data}
     except Exception as e:
         print(f"[AttOverall] Exception: {e}")
     return {"error": "Failed to fetch overall attendance"}
 
 @app.get("/api/attendance/leave-status")
 async def get_leave_status(request: Request, studtblId: str):
-    studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetLeaveStatusByStudent"
-    
-    params = dict(request.query_params)
-    params["studtblId"] = studtblId
-    if "academicYearId" not in params: params["academicYearId"] = 14
-    if "branchId" not in params: params["branchId"] = 2
-    if "semesterId" not in params: params["semesterId"] = 6
+    params = build_attendance_params(request)
+    params["studtblId"] = fix_id(studtblId)
+    inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
+            print(f"[AttLeave] {inst_id} status={resp.status_code}")
             if resp.status_code == 200:
                 json_data = resp.json()
-                if isinstance(json_data, list):
-                    return {"success": True, "data": json_data}
-                return json_data
+                data = _extract_attendance_data(json_data, inst_id)
+                return {"success": True, "data": data}
     except Exception as e:
         print(f"[AttLeave] Exception: {e}")
     return {"error": "Failed to fetch leave status"}

@@ -42,9 +42,10 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
     // Process data into a map for easy lookup
     const attendanceMap = useMemo(() => {
         const map = new Map<string, DailyAttendance>();
-        dailyData.forEach(item => {
+        (dailyData || []).forEach(item => {
+            if (!item?.attendanceDate) return;
             // API date might be YYYY-MM-DDT00:00:00, ensure we just get YYYY-MM-DD
-            const key = item.attendanceDate.split('T')[0];
+            const key = String(item.attendanceDate).split('T')[0];
             map.set(key, item);
         });
         return map;
@@ -89,7 +90,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
             let isPresent = false;
             let isHoliday = false;
 
-            if (data) {
+            if (data?.attendance && typeof data.attendance === 'object') {
                 const statuses = Object.values(data.attendance);
                 // Normalize status check
                 const isStatusPresent = (s: string) => ['P', 'Present'].some(v => s && s.toUpperCase().startsWith(v.toUpperCase()));
@@ -149,7 +150,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Calendar View */}
-            <div className="md:col-span-2 bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-6 shadow-xl">
+            <div className="md:col-span-2 bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -167,38 +168,38 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                 </div>
 
                 {/* Days Header */}
-                <div className="grid grid-cols-7 mb-4 text-center">
+                <div className="grid grid-cols-7 mb-4">
                     {DAYS.map(day => (
-                        <div key={day} className="text-xs font-bold text-slate-400 uppercase tracking-wider py-2">
+                        <div key={day} className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider py-2">
                             {day}
                         </div>
                     ))}
                 </div>
 
                 {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-y-4 justify-items-center">
-                    {loading ? (
-                        // Skeleton loader for grid
-                        Array.from({ length: 35 }).map((_, i) => (
-                            <div key={i} className="h-10 w-10 rounded-full bg-slate-50 animate-pulse" />
-                        ))
-                    ) : (
-                        renderCalendarDays()
-                    )}
+                <div className="grid grid-cols-7 gap-2 sm:gap-3">
+                    {renderCalendarDays()}
                 </div>
 
                 {/* Legend */}
-                <div className="mt-8 flex flex-wrap gap-4 justify-center text-xs text-slate-400">
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /> Present</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-500" /> On Duty</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500" /> Absent</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500" /> Partial</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400" /> Holiday</div>
+                <div className="mt-6 flex flex-wrap gap-4 justify-center">
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <div className="w-3 h-3 rounded-full bg-emerald-500" /> Present
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <div className="w-3 h-3 rounded-full bg-rose-500" /> Absent
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <div className="w-3 h-3 rounded-full bg-purple-500" /> On Duty
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <div className="w-3 h-3 rounded-full bg-amber-500" /> Holiday
+                    </div>
                 </div>
             </div>
 
             {/* Detail View (Side Panel) */}
-            <div className="bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-6 shadow-xl flex flex-col h-full rounded-2xl">
+            <div className="bg-white border border-slate-200/60 shadow-lg shadow-slate-100/50 rounded-2xl p-6 flex flex-col h-full">
                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <Clock className="text-blue-400" size={18} />
                     Daily Breakdown
@@ -217,7 +218,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                                 {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             </div>
 
-                            {selectedDayData ? (
+                            {selectedDayData?.attendance && typeof selectedDayData.attendance === 'object' ? (
                                 <div className="space-y-3">
                                     {Object.entries(selectedDayData.attendance).map(([period, status]) => (
                                         <div key={period} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-300 transition-colors">
@@ -248,45 +249,18 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                             )}
                         </motion.div>
                     ) : (
-                        leaveData && leaveData.length > 0 ? (
-                            <motion.div
-                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                className="flex-1 overflow-y-auto pr-1 custom-scrollbar"
-                            >
-                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <AlertCircle size={14} /> Leave History
-                                </h4>
-                                <div className="space-y-3">
-                                    {leaveData.map((leave, i) => (
-                                        <div key={i} className="p-3 rounded-xl bg-orange-50/50 border border-orange-100/60 hover:border-orange-200 transition-colors">
-                                            <div className="flex justify-between items-start mb-1.5">
-                                                <span className="text-sm font-bold text-slate-700 line-clamp-1">{leave.reasonName}</span>
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${leave.leaveStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600' :
-                                                    leave.leaveStatus === 'Rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
-                                                    }`}>
-                                                    {leave.leaveStatus}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                <CalendarIcon size={12} />
-                                                {new Date(leave.fromDate).toLocaleDateString()} - {new Date(leave.toDate).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="flex flex-col items-center justify-center h-64 text-slate-400 text-center"
-                            >
-                                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
-                                    <CalendarIcon size={32} className="text-blue-400/50" />
-                                </div>
-                                <p>Select a date to view <br /> period-wise details</p>
-                            </motion.div>
-                        )
+                        <motion.div
+                            key="no-selection"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 text-sm italic h-64"
+                        >
+                            <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+                                <CalendarIcon size={32} className="text-blue-400/50" />
+                            </div>
+                            <p>Select a date to view <br /> period-wise details</p>
+                        </motion.div>
                     )}
                 </AnimatePresence>
             </div>
