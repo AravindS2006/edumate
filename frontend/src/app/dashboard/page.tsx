@@ -174,6 +174,9 @@ export default function Dashboard() {
         const cachedAcadPct = safelyParse(`cache_${id}_acadPct`);
         const cachedParent = safelyParse(`cache_${id}_parent`);
 
+        console.log("Dashboard: Cached Stats", cachedStats);
+        console.log("Dashboard: Cached Personal", cachedPersonal);
+
         if (cachedStats) setStats(cachedStats);
         if (cachedPersonal) setPersonal(cachedPersonal);
         if (cachedAcademic) setAcademic(cachedAcademic);
@@ -473,12 +476,19 @@ export default function Dashboard() {
                 <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
                     className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-4">
                     {!stats ? (
-                        <>
-                            <StatCardSkeleton />
-                            <StatCardSkeleton />
-                            <StatCardSkeleton />
-                            <StatCardSkeleton />
-                        </>
+                        loading ? (
+                            <>
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
+                            </>
+                        ) : (
+                            <div className="col-span-2 md:col-span-4 p-6 rounded-xl border border-red-100 bg-red-50/50 flex flex-col items-center justify-center text-center gap-2">
+                                <AlertCircle className="text-red-400" size={24} />
+                                <p className="text-xs font-semibold text-red-400">Failed to load statistics</p>
+                            </div>
+                        )
                     ) : (
                         <>
                             <StatCard icon={Calendar} label="Attendance" value={`${attendPct}%`}
@@ -552,7 +562,14 @@ export default function Dashboard() {
                         {/* Attendance Ring + Breakdown */}
                         <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
                             {!stats ? (
-                                <AttendanceRingSkeleton />
+                                loading ? (
+                                    <AttendanceRingSkeleton />
+                                ) : (
+                                    <div className="rounded-2xl p-8 border border-red-100 bg-red-50/50 flex flex-col items-center text-center gap-2">
+                                        <AlertCircle className="text-red-400" size={32} />
+                                        <p className="text-sm font-semibold text-red-500">Attendance data unavailable</p>
+                                    </div>
+                                )
                             ) : (
                                 <div className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
                                     {/* Ring */}

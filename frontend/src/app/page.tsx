@@ -43,6 +43,21 @@ export default function Home() {
         if (data.access_token) localStorage.setItem('token', data.access_token);
         localStorage.setItem('institutionId', institution); // Store selected institution
 
+        // Cache prefetched data for instant dashboard load
+        if (data.prefetched && data.studtblId) {
+          console.log("Login: Prefetched data found", data.prefetched);
+          if (data.prefetched.stats) {
+            localStorage.setItem(`cache_${data.studtblId}_stats`, JSON.stringify(data.prefetched.stats));
+            console.log("Login: Stats cached");
+          }
+          if (data.prefetched.personal) {
+            localStorage.setItem(`cache_${data.studtblId}_personal`, JSON.stringify(data.prefetched.personal));
+            console.log("Login: Personal data cached");
+          }
+        } else {
+          console.log("Login: No prefetched data found");
+        }
+
         if (!data.studtblId && !data.token && !data.access_token) {
           console.warn("No token/id found in response");
         }

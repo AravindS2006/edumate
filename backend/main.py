@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 import json
+import asyncio
 from crypto_utils import encrypt_data, decrypt_data
 from sheets_logger import sheets_logger
 
@@ -100,28 +101,31 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
             
             if response.status_code == 200:
                 data = response.json()
+                userId = data.get("userId")
+                idToken = data.get("idToken")
                 
-                # Fetch Name from Personal Details for better logging
+                # Prefetch Data for Instant Dashboard Load
+                # Use a fresh client to avoid any state issues and set a longer timeout
+                print(f"[Login] Prefetching data for {credentials.username}...")
+                
+                headers["Authorization"] = f"Bearer {idToken}"
+                
+                async with httpx.AsyncClient(timeout=30.0) as prefetch_client:
+                    personal_task = _fetch_personal_details(prefetch_client, base_url, headers, userId)
+                    stats_task = _fetch_dashboard_stats(prefetch_client, base_url, headers, userId)
+                    
+                    try:
+                        personal_data, stats_data = await asyncio.gather(personal_task, stats_task)
+                        print(f"[Login] Prefetch success. Stats: {'Found' if stats_data else 'None'}, Personal: {'Found' if personal_data else 'None'}")
+                    except Exception as e:
+                        print(f"[Login] Prefetch failed: {e}")
+                        personal_data, stats_data = None, None
+                
+                # Extract name for logging
                 student_name = "Unknown"
-                try:
-                    # Update headers with the new token
-                    headers["Authorization"] = f"Bearer {data.get('idToken')}"
-                    pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
-                    if pers_resp.status_code == 200:
-                        p_data = pers_resp.json()
-                        # Some APIs return {"data": {"studentName": ...}}, others return {"studentName": ...}
-                        inner_data = p_data.get("data") if isinstance(p_data, dict) else {}
-                        if isinstance(p_data, list) and len(p_data) > 0:
-                            # Handle case where p_data is a list
-                            inner_data = p_data[0]
-                        
-                        student_name = (inner_data.get("studentName") if isinstance(inner_data, dict) else None) or \
-                                      p_data.get("studentName") or \
-                                      (inner_data.get("name") if isinstance(inner_data, dict) else None) or \
-                                      p_data.get("name") or \
-                                      data.get("name", "Unknown")
-                except Exception as e:
-                    print(f"Failed to fetch student name for logging: {e}")
+                if personal_data:
+                    student_name = personal_data.get("name") or "Unknown"
+                else:
                     student_name = data.get("name", "Unknown")
 
                 # Log success
@@ -136,9 +140,14 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                     background_tasks.add_task(sheets_logger.log_login, user_details)
 
                 return {
-                    "token": data.get("idToken"),
-                    "studtblId": data.get("userId"),
-                    "user_data": data 
+                    "token": idToken,
+                    "studtblId": userId,
+                    "user_data": data,
+                    # Prefetched data for frontend caching
+                    "prefetched": {
+                        "personal": personal_data,
+                        "stats": stats_data
+                    }
                 }
             else:
                 print(f"Upstream Error: {response.text}")
@@ -209,53 +218,59 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
 # ============================================================
 #  DASHBOARD STATS
 # ============================================================
+# ============================================================
+#  DASHBOARD STATS
+# ============================================================
+async def _fetch_dashboard_stats(client, base_url, headers, studtblId):
+    studtblId = fix_id(studtblId)
+    upstream_url = f"{base_url}/Dashboard/GetStudentDashboardDetails"
+    try:
+        resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+        if resp.status_code == 200:
+            json_data = resp.json()
+            stats = {
+                "attendance_percentage": 0,
+                "cgpa": 0.0,
+                "arrears": 0,
+                "od_percentage": 0,
+                "od_count": 0,
+                "absent_percentage": 0,
+                "program": "",
+                "branch_code": "",
+                "mentor_name": "",
+                "total_semesters": 0,
+                "total_years": 0
+            }
+            
+            if "data" in json_data and isinstance(json_data["data"], list) and len(json_data["data"]) > 0:
+                raw = json_data["data"][0]
+                stats = {
+                    "attendance_percentage": raw.get("attendancePercentage", 0),
+                    "cgpa": raw.get("uG_Cgpa", 0.0),
+                    "arrears": 0,
+                    "od_percentage": raw.get("odPercentage", 0),
+                    "od_count": raw.get("odCount", 0),
+                    "absent_percentage": raw.get("absentPercentage", 0),
+                    "program": raw.get("program", ""),
+                    "branch_code": raw.get("branchCode", ""),
+                    "mentor_name": raw.get("mentorName", ""),
+                    "total_semesters": raw.get("totalSemesters", 0),
+                    "total_years": raw.get("totalYears", 0)
+                }
+            return stats
+    except Exception as e:
+        print(f"[Dashboard] Exception: {e}")
+    return None
+
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
-    upstream_url = f"{base_url}/Dashboard/GetStudentDashboardDetails"
     
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
-            print(f"[Dashboard] ID: '{studtblId}' | Status: {resp.status_code}")
-            
-            if resp.status_code == 200:
-                json_data = resp.json()
-                stats = {
-                    "attendance_percentage": 0,
-                    "cgpa": 0.0,
-                    "arrears": 0,
-                    "od_percentage": 0,
-                    "od_count": 0,
-                    "absent_percentage": 0,
-                    "program": "",
-                    "branch_code": "",
-                    "mentor_name": "",
-                    "total_semesters": 0,
-                    "total_years": 0
-                }
-                
-                if "data" in json_data and isinstance(json_data["data"], list) and len(json_data["data"]) > 0:
-                    raw = json_data["data"][0]
-                    stats = {
-                        "attendance_percentage": raw.get("attendancePercentage", 0),
-                        "cgpa": raw.get("uG_Cgpa", 0.0),
-                        "arrears": 0,  # Will be filled from exam-status
-                        "od_percentage": raw.get("odPercentage", 0),
-                        "od_count": raw.get("odCount", 0),
-                        "absent_percentage": raw.get("absentPercentage", 0),
-                        "program": raw.get("program", ""),
-                        "branch_code": raw.get("branchCode", ""),
-                        "mentor_name": raw.get("mentorName", ""),
-                        "total_semesters": raw.get("totalSemesters", 0),
-                        "total_years": raw.get("totalYears", 0)
-                    }
-                return stats
-            else:
-                print(f"[Dashboard] Error: {resp.text[:200]}")
-    except Exception as e:
-        print(f"[Dashboard] Exception: {e}")
+    async with httpx.AsyncClient() as client:
+        stats = await _fetch_dashboard_stats(client, base_url, headers, studtblId)
+        if stats:
+            return stats
         
     return {"error": "Failed to fetch dashboard data"}
 
@@ -308,38 +323,50 @@ async def get_academic_details(request: Request, studtblId: str):
 # ============================================================
 #  PERSONAL DETAILS
 # ============================================================
+async def _fetch_personal_details(client, base_url, headers, studtblId):
+    studtblId = fix_id(studtblId)
+    upstream_url = f"{base_url}/Student/GetStudentPersonalDetails"
+    try:
+        resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+        if resp.status_code == 200:
+            json_data = resp.json()
+            if "data" in json_data and json_data["data"]:
+                raw = json_data["data"]
+                # Handle cases where data is a list (sometimes happens)
+                if isinstance(raw, list) and len(raw) > 0:
+                    raw = raw[0]
+                elif isinstance(raw, list):
+                    return None
+
+                return {
+                    "name": raw.get("studentName", ""),
+                    "reg_no": raw.get("studRollNo", ""),
+                    "photo_id": raw.get("photoDocumentId", ""),
+                    "email": raw.get("officialEmailid", ""),
+                    "date_of_birth": raw.get("dateOfBirth", ""),
+                    "gender": raw.get("gender", ""),
+                    "community": raw.get("community", ""),
+                    "religion": raw.get("religion", ""),
+                    "mobile": raw.get("mobileNo", ""),
+                    "bus_route": raw.get("busRoute", ""),
+                    "hostel": raw.get("isHostel", False),
+                    "languages": raw.get("languageKnown", ""),
+                    "age": raw.get("currentAge", "")
+                }
+    except Exception as e:
+        print(f"[Personal] Exception: {e}")
+    return None
+
 @app.get("/api/student/personal")
 async def get_personal_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
-    upstream_url = f"{base_url}/Student/GetStudentPersonalDetails"
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
-            if resp.status_code == 200:
-                json_data = resp.json()
-                if "data" in json_data and json_data["data"]:
-                    raw = json_data["data"]
-                    return {
-                        "name": raw.get("studentName", ""),
-                        "reg_no": raw.get("studRollNo", ""),
-                        "photo_id": raw.get("photoDocumentId", ""),
-                        "email": raw.get("officialEmailid", ""),
-                        "date_of_birth": raw.get("dateOfBirth", ""),
-                        "gender": raw.get("gender", ""),
-                        "community": raw.get("community", ""),
-                        "religion": raw.get("religion", ""),
-                        "mobile": raw.get("mobileNo", ""),
-                        "bus_route": raw.get("busRoute", ""),
-                        "hostel": raw.get("isHostel", False),
-                        "languages": raw.get("languageKnown", ""),
-                        "age": raw.get("currentAge", "")
-                    }
-            else:
-                print(f"[Personal] Error: {resp.text[:200]}")
-    except Exception as e:
-        print(f"[Personal] Exception: {e}")
-        
+    
+    async with httpx.AsyncClient() as client:
+        details = await _fetch_personal_details(client, base_url, headers, studtblId)
+        if details:
+            return details
+            
     return {"error": "Failed to fetch personal details"}
 
 # ============================================================
