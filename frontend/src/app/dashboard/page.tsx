@@ -167,7 +167,7 @@ export default function Dashboard() {
 
         setStudtblId(id);
 
-        // 1. Load from Cache Immediatey
+        // 1. Load from Cache Immediatley
         const cachedStats = safelyParse(`cache_${id}_stats`);
         const cachedPersonal = safelyParse(`cache_${id}_personal`);
         const cachedAcademic = safelyParse(`cache_${id}_academic`);
@@ -196,33 +196,39 @@ export default function Dashboard() {
         const fetchAndCache = async (url: string, setter: (data: any) => void, key: string) => {
             try {
                 const res = await fetch(url, { headers });
-                if (res.ok) {
-                    const json = await res.json();
+                const json = await res.json(); // Always parse JSON first to check for error object
+
+                if (res.ok && !json.error) {
                     setter(json);
                     localStorage.setItem(`cache_${id}_${key}`, JSON.stringify(json));
-                    // If this was the first load and we didn't have cache, stop loading
-                    setLoading(false);
+                    if (!cachedStats) setLoading(false);
+                    return true;
+                } else {
+                    // Handle API error response (even with 200 OK)
+                    console.error(`API Error for ${key}:`, json.error || res.statusText);
+                    if (!cachedStats && key === 'stats') {
+                        setError(json.error || 'Failed to load data.');
+                    }
+                    return false;
                 }
             } catch (e) {
                 console.error(`Failed to fetch ${key}`, e);
+                return false;
             }
         };
 
         const loadFreshData = async () => {
-            // We fire these off in parallel but don't wait for all of them to update state
-            // This allows the UI to populate piece-by-piece
-            Promise.all([
+            // We fire these off in parallel
+            await Promise.allSettled([
                 fetchAndCache(`${API}/api/dashboard/stats?studtblId=${eid}`, setStats, 'stats'),
                 fetchAndCache(`${API}/api/student/personal?studtblId=${eid}`, setPersonal, 'personal'),
                 fetchAndCache(`${API}/api/student/academic?studtblId=${eid}`, setAcademic, 'academic'),
                 fetchAndCache(`${API}/api/student/academic-percentage?studtblId=${eid}`, setAcadPct, 'acadPct'),
                 fetchAndCache(`${API}/api/student/parent?studtblId=${eid}`, setParentData, 'parent'),
-            ]).catch(err => {
-                console.error("Global load error", err);
-                // Only show full error if we have NO data
-                if (!stats && !cachedStats) setError('Network error — check connection.');
-                setLoading(false);
-            });
+            ]);
+
+            // Ensure loading stops after all attempts, even if failed
+            setLoading(false);
         };
 
         loadFreshData();
