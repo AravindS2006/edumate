@@ -78,6 +78,25 @@ export default function Home() {
 
 
 
+          {/* ── College Logo ── */}
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="mb-6"
+          >
+            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-lg shadow-indigo-100 ring-4 ring-indigo-50 overflow-hidden">
+              <Image
+                src="/assets/SAIRAM-ROUND-LOGO.png"
+                alt="Sri Sairam Institutions"
+                width={80}
+                height={80}
+                className="object-contain"
+                priority
+              />
+            </div>
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
