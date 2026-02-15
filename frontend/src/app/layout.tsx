@@ -73,17 +73,33 @@ export const viewport: Viewport = {
   themeColor: "#0f172a",
 };
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "EduMate",
-  "url": "https://edumate-sairam.vercel.app",
-  "potentialAction": {
-    "@type": "SearchAction",
-    "target": "https://edumate-sairam.vercel.app/?q={search_term_string}",
-    "query-input": "required name=search_term_string"
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "EduMate",
+    "url": "https://edumate-sairam.vercel.app",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://edumate-sairam.vercel.app/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Sri Sairam Engineering College",
+    "url": "https://edumate-sairam.vercel.app",
+    "logo": "https://edumate-sairam.vercel.app/assets/SAIRAM-ROUND-LOGO.png",
+    "sameAs": [
+      "https://sairam.edu.in/",
+      "https://sairamgroup.in/",
+      "https://www.facebook.com/sairamec/",
+      "https://in.linkedin.com/school/sri-sairam-engineering-college/",
+      "https://www.instagram.com/sairamec/"
+    ]
   }
-};
+];
 
 export default function RootLayout({
   children,

@@ -2,11 +2,14 @@
 module.exports = {
     siteUrl: 'https://edumate-sairam.vercel.app',
     generateRobotsTxt: true,
-    exclude: ['/dashboard/*', '/api/*'],
+    exclude: ['/dashboard', '/dashboard/*', '/api*'],
     robotsTxtOptions: {
         policies: [
-            { userAgent: '*', allow: '/' },
-            { userAgent: '*', disallow: ['/dashboard', '/api'] },
+            {
+                userAgent: '*',
+                allow: '/',
+                disallow: ['/dashboard', '/dashboard/*', '/api', '/api/*'],
+            },
         ],
     },
 }

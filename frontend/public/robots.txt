@@ -1,11 +1,10 @@
 # *
 User-agent: *
 Allow: /
-
-# *
-User-agent: *
 Disallow: /dashboard
+Disallow: /dashboard/*
 Disallow: /api
+Disallow: /api/*
 
 # Host
 Host: https://edumate-sairam.vercel.app
