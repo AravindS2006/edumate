@@ -1,0 +1,14 @@
+# *
+User-agent: *
+Allow: /
+
+# *
+User-agent: *
+Disallow: /dashboard
+Disallow: /api
+
+# Host
+Host: https://edumate-sairam.vercel.app
+
+# Sitemaps
+Sitemap: https://edumate-sairam.vercel.app/sitemap.xml
