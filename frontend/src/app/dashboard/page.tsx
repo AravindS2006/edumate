@@ -842,10 +842,23 @@ export default function Dashboard() {
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-bold text-slate-700">Report Ready</p>
-                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
+                                                        <button
+                                                            onClick={() => {
+                                                                if (!pdfUrl) return;
+                                                                // Simple iOS detection
+                                                                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                                                                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+                                                                if (isIOS) {
+                                                                    // iOS Safari blocks blob: in new tabs often. Navigate current tab to ensure viewing.
+                                                                    window.location.assign(pdfUrl);
+                                                                } else {
+                                                                    window.open(pdfUrl, '_blank');
+                                                                }
+                                                            }}
                                                             className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-lg shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
                                                             <ExternalLink size={14} /> Open to View
-                                                        </a>
+                                                        </button>
                                                     </div>
                                                 </div>
 
