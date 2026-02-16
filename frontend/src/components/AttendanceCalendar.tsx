@@ -193,7 +193,7 @@ export function AttendanceCalendar({ dailyData, leaveData, loading }: Attendance
                         <div className="w-3 h-3 rounded-full bg-purple-500" /> On Duty
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <div className="w-3 h-3 rounded-full bg-amber-500" /> Holiday
+                        <div className="w-3 h-3 rounded-full bg-amber-500" /> Partially Present
                     </div>
                 </div>
             </div>

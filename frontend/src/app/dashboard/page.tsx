@@ -823,10 +823,6 @@ export default function Dashboard() {
                                                         <CheckCircle2 size={14} className="text-emerald-400" /> Report generated successfully
                                                     </p>
                                                     <div className="flex gap-2">
-                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
-                                                            className="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all flex items-center gap-1.5">
-                                                            <ExternalLink size={14} /> Open New Tab
-                                                        </a>
                                                         <button onClick={() => { setPdfUrl(null); setSelectedSemester(null); }}
                                                             className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all flex items-center gap-1.5 border border-slate-200/60">
                                                             <X size={14} /> Close
@@ -834,9 +830,23 @@ export default function Dashboard() {
                                                     </div>
                                                 </div>
 
-                                                {/* Iframe Preview */}
-                                                <div className="w-full h-[500px] rounded-xl border border-slate-200/60 bg-slate-50 overflow-hidden relative">
+                                                {/* Desktop Preview (Hidden on Mobile) */}
+                                                <div className="hidden md:block w-full h-[500px] rounded-xl border border-slate-200/60 bg-slate-50 overflow-hidden relative">
                                                     <iframe src={pdfUrl} className="w-full h-full block" title="Report Preview" />
+                                                </div>
+
+                                                {/* Mobile Placeholder: Open in New Tab */}
+                                                <div className="md:hidden w-full h-[200px] rounded-xl border border-slate-200/60 bg-slate-50 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                                                    <div className="p-3 rounded-full bg-indigo-50">
+                                                        <FileText size={24} className="text-indigo-400" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-700">Report Ready</p>
+                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
+                                                            className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-lg shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
+                                                            <ExternalLink size={14} /> Open to View
+                                                        </a>
+                                                    </div>
                                                 </div>
 
                                                 <div className="flex justify-center">

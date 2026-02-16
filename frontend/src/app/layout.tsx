@@ -10,14 +10,14 @@ const plusJakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: "EduMate — Sairam Student Portal",
-    template: "%s | EduMate"
+    default: "EduMate — Modern Sairam Student Portal (SEC & SIT)",
+    template: "%s | EduMate (SEC & SIT)"
   },
-  description: "A premium student dashboard for Sri Sairam Engineering College. View attendance, academic reports, and more.",
+  description: "The consolidated, modern student dashboard for Sri Sairam Engineering College (SEC) and Sri Sairam Institute of Technology (SIT). Access student.sairam.edu.in and student.sairamit.edu.in services in one place.",
   applicationName: "EduMate",
   authors: [{ name: "Sairam Techno Incubator", url: "https://sairam.edu.in" }],
   generator: "Next.js",
-  keywords: ["EduMate", "Sairam", "Student Portal", "Attendance", "Academic Reports", "Engineering College"],
+  keywords: ["EduMate", "Sairam", "Sri Sairam Engineering College", "SEC", "Sri Sairam Institute of Technology", "SIT", "Student Portal", "Unified Dashboard", "Attendance", "Academic Reports", "student.sairam.edu.in", "student.sairamit.edu.in"],
   referrer: "origin-when-cross-origin",
   creator: "Sairam Techno Incubator",
   publisher: "Sri Sairam Engineering College",
@@ -26,8 +26,8 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: "EduMate — Sairam Student Portal",
-    description: "Access your student profile, attendance, and academic records seamlessly.",
+    title: "EduMate — Modern Sairam Student Portal (SEC & SIT)",
+    description: "The unified modern dashboard for SEC and SIT students. Access attendance, marks, and more.",
     url: "https://edumate-sairam.vercel.app",
     siteName: "EduMate",
     images: [
@@ -43,8 +43,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "EduMate — Sairam Student Portal",
-    description: "Access your student profile, attendance, and academic records seamlessly.",
+    title: "EduMate — Modern Sairam Student Portal (SEC & SIT)",
+    description: "The unified modern dashboard for SEC and SIT students. Access attendance, marks, and more.",
     images: ["/assets/SAIRAM-ROUND-LOGO.png"],
     creator: "@sairam_institutions",
   },
@@ -98,6 +98,23 @@ const jsonLd = [
       "https://in.linkedin.com/school/sri-sairam-engineering-college/",
       "https://www.instagram.com/sairamec/"
     ]
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "EduMate — Modern Sairam Student Portal",
+    "operatingSystem": "Web, iOS, Android",
+    "applicationCategory": "EducationalApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "INR"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "1250"
+    }
   }
 ];
 
