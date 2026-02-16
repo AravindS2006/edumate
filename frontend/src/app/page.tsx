@@ -93,6 +93,7 @@ export default function Home() {
                 height={80}
                 className="object-contain"
                 priority
+                fetchPriority="high"
               />
             </div>
           </motion.div>
@@ -107,7 +108,7 @@ export default function Home() {
               EduMate
             </h1>
 
-            <p className="text-slate-500 mt-3 text-sm">Sign in to your student portal</p>
+            <p className="text-slate-600 mt-3 text-sm">Sign in to your student portal</p>
           </motion.div>
 
           <form onSubmit={handleLogin} className="w-full space-y-4">
@@ -120,7 +121,7 @@ export default function Home() {
                   onClick={() => setInstitution('SEC')}
                   className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all ${institution === 'SEC'
                     ? 'bg-white text-indigo-600 shadow-sm border border-slate-100'
-                    : 'text-slate-500 hover:text-slate-700'
+                    : 'text-slate-600 hover:text-slate-800'
                     }`}
                 >
                   SEC
@@ -130,7 +131,7 @@ export default function Home() {
                   onClick={() => setInstitution('SIT')}
                   className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all ${institution === 'SIT'
                     ? 'bg-white text-indigo-600 shadow-sm border border-slate-100'
-                    : 'text-slate-500 hover:text-slate-700'
+                    : 'text-slate-600 hover:text-slate-800'
                     }`}
                 >
                   SIT
@@ -139,7 +140,7 @@ export default function Home() {
             </div>
 
             <div className="relative group">
-              <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
+              <Mail className="absolute left-3 top-3.5 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input
                 type="text"
                 placeholder="Email"
@@ -151,7 +152,7 @@ export default function Home() {
             </div>
 
             <div className="relative group">
-              <Lock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
+              <Lock className="absolute left-3 top-3.5 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input
                 type="password"
                 placeholder="Password"
@@ -190,8 +191,8 @@ export default function Home() {
 
 
             <div className="text-center space-y-1 pt-1">
-              <p className="text-xs text-slate-400 font-semibold">Protected by AES-256 Encryption</p>
-              <p className="text-[10px] text-slate-400">© {new Date().getFullYear()} EduMate</p>
+              <p className="text-xs text-slate-500 font-semibold">Protected by AES-256 Encryption</p>
+              <p className="text-[10px] text-slate-500">© {new Date().getFullYear()} EduMate</p>
             </div>
           </motion.div>
         </div>

@@ -65,36 +65,27 @@ body {
 
 /* ── Glass Button ── */
 .glass-button {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed, #0891b2);
-  background-size: 200% 200%;
-  animation: gradientShift 4s ease infinite;
+  position: relative;
+  background: linear-gradient(135deg, #4f46e5, #9333ea, #06b6d4);
+  /* Indigo-600 -> Purple-600 -> Cyan-500 */
   color: white;
   font-weight: 700;
   padding: 0.875rem 1.5rem;
   border-radius: 0.875rem;
-  box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.35);
-  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glass-button:hover {
-  box-shadow: 0 12px 28px -4px rgba(79, 70, 229, 0.45);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
+  transform: translateY(-2px);
+  filter: brightness(1.1);
 }
 
 .glass-button:active {
   transform: translateY(0);
-}
-
-@keyframes gradientShift {
-
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-
-  50% {
-    background-position: 100% 50%;
-  }
 }
 
 /* ── Text Effects ── */
