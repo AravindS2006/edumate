@@ -1,0 +1,39 @@
+{
+  "stats": {
+    "cgpa": 0.0,
+    "attendance": 85,
+    "history_of_arrears": 0,
+    "standing_arrears": 0,
+    "raw_data": {
+      "attendancePercentage": 85
+    }
+  },
+  "academic": {
+    "dept": "Unknown",
+    "semester": 0,
+    "semester_name": "",
+    "batch": "",
+    "mentor_name": "",
+    "current_academic_year": ""
+  },
+  "personal": {
+    "name": "",
+    "reg_no": "",
+    "email": "",
+    "photo_id": ""
+  },
+  "exam_status": {
+    "attendance_eligible": false,
+    "fees_eligible": false,
+    "current_status": ""
+  },
+  "attendance_overall": [
+    {
+      "attendancePercentage": 85
+    }
+  ],
+  "parent": {
+    "father_name": "",
+    "father_mobile": ""
+  }
+}

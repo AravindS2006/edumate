@@ -1,10 +1,14 @@
 from fastapi import FastAPI, HTTPException, Request, Response, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, ORJSONResponse
 from pydantic import BaseModel
 import httpx
 import json
 import os, sys
+import time
+import asyncio
+from contextlib import asynccontextmanager
+from typing import Dict, Any, Optional
 # Ensure crypto_utils can be imported from same directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from crypto_utils import encrypt_data, decrypt_data
@@ -21,9 +25,48 @@ except Exception as e:
     sheets_logger = None
 
 # SECRET KEY for accessing logs
+# SECRET KEY for accessing logs
 LOGS_SECRET_KEY = "edumate_admin_secret"
 
-app = FastAPI()
+# Simple In-Memory TTL Cache
+class TTLCache:
+    def __init__(self, ttl: int = 60):
+        self.cache: Dict[str, Any] = {}
+        self.ttl = ttl
+        self.lock = asyncio.Lock()
+
+    async def get(self, key: str) -> Optional[Any]:
+        async with self.lock:
+            entry = self.cache.get(key)
+            if entry:
+                data, expiry = entry
+                if time.time() < expiry:
+                    return data
+                del self.cache[key]
+            return None
+
+    async def set(self, key: str, value: Any):
+        async with self.lock:
+            self.cache[key] = (value, time.time() + self.ttl)
+
+    async def clear(self):
+        async with self.lock:
+            self.cache.clear()
+
+# Initialize Cache
+response_cache = TTLCache(ttl=60)  # 60 seconds cache
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create Transport for Connection Pooling
+    print("Starting up: Creating global HTTP transport...")
+    app.state.transport = httpx.AsyncHTTPTransport(limits=httpx.Limits(max_keepalive_connections=5, max_connections=10))
+    yield
+    # Shutdown: Close Transport
+    print("Shutting down: Closing global HTTP transport...")
+    await app.state.transport.aclose()
+
+app = FastAPI(lifespan=lifespan, default_response_class=ORJSONResponse)
 
 @app.get("/api/health")
 async def health_check():
@@ -98,7 +141,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
     print(f"Attempting Login for user: {credentials.username}")
     client_ip = request.client.host if request.client else "Unknown"
     
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(transport=request.app.state.transport, timeout=10.0) as client:
         try:
             response = await client.post(f"{base_url}/User/Login", json=payload, headers=headers)
             print(f"Upstream Response Status: {response.status_code}")
@@ -238,7 +281,8 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
                 return Response(
                     content=resp.content,
                     media_type=content_type,
-                    status_code=200
+                    status_code=200,
+                    headers={"Cache-Control": "public, max-age=3600"}
                 )
             else:
                 print(f"[Image] Failed: {resp.text[:200]}")
@@ -251,13 +295,19 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
 #  DASHBOARD STATS
 # ============================================================
 @app.get("/api/dashboard/stats")
-async def get_dashboard_stats(request: Request, studtblId: str):
+async def get_dashboard_stats(request: Request, studtblId: str, response: Response):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Dashboard/GetStudentDashboardDetails"
     
+    # Cache check
+    cache_key = f"dashboard:{studtblId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             print(f"[Dashboard] ID: '{studtblId}' | Status: {resp.status_code}")
             
@@ -294,6 +344,10 @@ async def get_dashboard_stats(request: Request, studtblId: str):
                         "pgpa": raw.get("pG_Cgpa", 0.0),
                         "raw_data": raw
                     }
+                
+                # Set Cache
+                await response_cache.set(cache_key, stats)
+                response.headers["Cache-Control"] = "public, max-age=60"
                 return stats
             else:
                 print(f"[Dashboard] Error: {resp.text[:200]}")
@@ -306,13 +360,20 @@ async def get_dashboard_stats(request: Request, studtblId: str):
 #  ACADEMIC DETAILS
 # ============================================================
 @app.get("/api/student/academic")
-async def get_academic_details(request: Request, studtblId: str):
+async def get_academic_details(request: Request, studtblId: str, response: Response):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentAcademicDetails"
     
+    # Cache check
+    cache_key = f"academic:{studtblId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             print(f"[Academic] ID: '{studtblId}' | Status: {resp.status_code}")
             
@@ -321,7 +382,7 @@ async def get_academic_details(request: Request, studtblId: str):
                 if "data" in data and isinstance(data["data"], list) and len(data["data"]) > 0:
                     raw = data["data"][0]
                     semester = raw.get("currentSemsterId") or raw.get("semester") or 0
-                    return {
+                    result = {
                         "dept": raw.get("studentDepartment") or raw.get("dept", "Unknown"),
                         "semester": semester,
                         "semester_name": raw.get("semesterName", ""),
@@ -341,6 +402,9 @@ async def get_academic_details(request: Request, studtblId: str):
                         "academic_year_id": raw.get("academicYearId") or raw.get("academic_year_id", 0),
                         "academic_batch_id": raw.get("academicBatchId") or raw.get("academic_batch_id", 0)
                     }
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
     except Exception as e:
         print(f"[Academic] Exception: {e}")
 
@@ -350,18 +414,25 @@ async def get_academic_details(request: Request, studtblId: str):
 #  PERSONAL DETAILS
 # ============================================================
 @app.get("/api/student/personal")
-async def get_personal_details(request: Request, studtblId: str):
+async def get_personal_details(request: Request, studtblId: str, response: Response):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentPersonalDetails"
+    # Cache check
+    cache_key = f"personal:{studtblId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
                 if "data" in json_data and json_data["data"]:
                     raw = json_data["data"]
-                    return {
+                    result = {
                         "name": raw.get("studentName", ""),
                         "reg_no": raw.get("studRollNo", ""),
                         "photo_id": raw.get("photoDocumentId", ""),
@@ -376,6 +447,9 @@ async def get_personal_details(request: Request, studtblId: str):
                         "languages": raw.get("languageKnown", ""),
                         "age": raw.get("currentAge", "")
                     }
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
             else:
                 print(f"[Personal] Error: {resp.text[:200]}")
     except Exception as e:
@@ -384,10 +458,139 @@ async def get_personal_details(request: Request, studtblId: str):
     return {"error": "Failed to fetch personal details"}
 
 # ============================================================
+#  FULL STUDENT PROFILE (AGGREGATED)
+# ============================================================
+@app.get("/api/student/full-profile")
+async def get_full_student_profile(request: Request, studtblId: str, response: Response,
+                                   academicYearId: int = 14, yearOfStudyId: int = 3,
+                                   semesterId: int = 6, branchId: int = 2,
+                                   sectionId: int = 2, semesterType: str = "Even"):
+    """
+    Aggressively fetches all student data in parallel and returns a single JSON object.
+    Reduces latency and Vercel function invocations.
+    """
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
+
+    # Cache check
+    cache_key = f"full_profile:{studtblId}:{inst_id}:sem{semesterId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
+    endpoints = {
+        "stats": (f"{base_url}/Dashboard/GetStudentDashboardDetails", {"studtblId": studtblId}),
+        "academic": (f"{base_url}/Student/GetStudentAcademicDetails", {"studtblId": studtblId}),
+        "personal": (f"{base_url}/Student/GetStudentPersonalDetails", {"studtblId": studtblId}),
+        "exam_status": (f"{base_url}/HallTicket/GetStudentExamStatus", {
+             "studtblId": studtblId, "AcademicYearId": academicYearId, "YearOfStudyId": yearOfStudyId,
+             "SemesterId": semesterId, "BranchId": branchId, "SectionId": sectionId, "presemesterType": semesterType
+        }),
+        "attendance_overall": (f"{base_url}/Student/GetAttendanceOverAllDetail", {**build_attendance_params(request), "studtblId": studtblId}),
+        "parent": (f"{base_url}/Student/GetStudentParentDetails", {"studtblId": studtblId})
+    }
+
+    try:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
+            # Create tasks
+            tasks = []
+            keys = []
+            
+            for key, (url, params) in endpoints.items():
+                keys.append(key)
+                tasks.append(client.get(url, params=params, headers=headers))
+            
+            # Execute in parallel
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            aggregated_data = {}
+            
+            for key, resp in zip(keys, responses):
+                if isinstance(resp, Exception):
+                    print(f"[FullProfile] {key} failed: {resp}")
+                    aggregated_data[key] = {"error": str(resp)}
+                    continue
+                
+                if resp.status_code == 200:
+                    json_data = resp.json()
+                    
+                    # Logic extraction (simplified replication of individual endpoints)
+                    if key == "stats":
+                        if "data" in json_data and isinstance(json_data["data"], list) and len(json_data["data"]) > 0:
+                            raw = json_data["data"][0]
+                            aggregated_data[key] = {
+                                "cgpa": raw.get("uG_Cgpa", 0.0), # Corrected key from uG_Cgpa
+                                "attendance": raw.get("attendancePercentage", 0),
+                                "history_of_arrears": raw.get("historyOfArrears", 0),
+                                "standing_arrears": raw.get("standingArrears", 0),
+                                "raw_data": raw
+                            } 
+                        else: aggregated_data[key] = None
+                    elif key == "academic":
+                        if "data" in json_data and isinstance(json_data["data"], list) and len(json_data["data"]) > 0:
+                            raw = json_data["data"][0]
+                            aggregated_data[key] = {
+                                "dept": raw.get("studentDepartment") or raw.get("dept", "Unknown"),
+                                "semester": raw.get("currentSemsterId") or raw.get("semester") or 0,
+                                "semester_name": raw.get("semesterName", ""),
+                                "batch": raw.get("academicBatchYear", ""),
+                                "mentor_name": raw.get("mentorName", ""),
+                                "current_academic_year": raw.get("currentAcademicYear", "")
+                            }
+                        else: aggregated_data[key] = None
+                    elif key == "personal":
+                         if "data" in json_data:
+                            raw = json_data["data"]
+                            # Handle list or dict weirdness if needed, but usually dict here
+                            if isinstance(raw, list) and raw: raw = raw[0]
+                            
+                            aggregated_data[key] = {
+                                "name": raw.get("studentName", "") or raw.get("name", ""),
+                                "reg_no": raw.get("studRollNo", ""),
+                                "email": raw.get("officialEmailid", ""),
+                                "photo_id": raw.get("photoDocumentId", ""), 
+                            }
+                         else: aggregated_data[key] = None
+                    elif key == "exam_status":
+                         if "data" in json_data:
+                            raw = json_data["data"]
+                            if isinstance(raw, list) and raw: raw = raw[0]
+                            aggregated_data[key] = {
+                                "attendance_eligible": raw.get("isAttendanceEligible", False),
+                                "fees_eligible": raw.get("isFeesEligible", False),
+                                "current_status": raw.get("currentStatus", "")
+                            }
+                         else: aggregated_data[key] = None
+                    elif key == "attendance_overall":
+                         aggregated_data[key] = _extract_attendance_data(json_data)
+                    elif key == "parent":
+                         if "data" in json_data:
+                            raw = json_data["data"]
+                            if isinstance(raw, list) and raw: raw = raw[0]
+                            aggregated_data[key] = {
+                                "father_name": raw.get("fatherName", ""),
+                                "father_mobile": raw.get("fatherMobileNo", "")
+                            }
+                         else: aggregated_data[key] = None
+                else:
+                    aggregated_data[key] = {"error": f"Status {resp.status_code}"}
+            
+            # Cache the result
+            await response_cache.set(cache_key, aggregated_data)
+            response.headers["Cache-Control"] = "public, max-age=60"
+            return aggregated_data
+
+    except Exception as e:
+        print(f"[FullProfile] Exception: {e}")
+        return {"error": f"Failed to fetch full profile: {str(e)}"}
+
+# ============================================================
 #  EXAM STATUS
 # ============================================================
 @app.get("/api/student/exam-status")
-async def get_exam_status(request: Request, studtblId: str, 
+async def get_exam_status(request: Request, studtblId: str, response: Response, 
                           academicYearId: int = 14, yearOfStudyId: int = 3,
                           semesterId: int = 6, branchId: int = 2,
                           sectionId: int = 2, semesterType: str = "Even"):
@@ -404,8 +607,15 @@ async def get_exam_status(request: Request, studtblId: str,
         "presemesterType": semesterType
     }
     
+    # Cache check
+    cache_key = f"exam_status:{studtblId}:{academicYearId}:{semesterId}:{yearOfStudyId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             print(f"[ExamStatus] Status: {resp.status_code}")
             
@@ -413,7 +623,7 @@ async def get_exam_status(request: Request, studtblId: str,
                 json_data = resp.json()
                 if "data" in json_data and json_data["data"]:
                     raw = json_data["data"]
-                    return {
+                    result = {
                         "attendance_eligible": raw.get("isAttendanceEligible", False),
                         "fees_eligible": raw.get("isFeesEligible", False),
                         "current_status": raw.get("currentStatus", ""),
@@ -423,6 +633,9 @@ async def get_exam_status(request: Request, studtblId: str,
                         "attendance_pct": raw.get("attendancePercentage", 0),
                         "od_pct": raw.get("odPercentage", 0)
                     }
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
     except Exception as e:
         print(f"[ExamStatus] Exception: {e}")
     
@@ -432,20 +645,27 @@ async def get_exam_status(request: Request, studtblId: str,
 #  ACADEMIC PERCENTAGE
 # ============================================================
 @app.get("/api/student/academic-percentage")
-async def get_academic_percentage(request: Request, studtblId: str):
+async def get_academic_percentage(request: Request, studtblId: str, response: Response):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentAcademicPercentage"
     
+    # Cache check
+    cache_key = f"acad_pct:{studtblId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             print(f"[AcadPct] Status: {resp.status_code}")
             
             if resp.status_code == 200:
                 json_data = resp.json()
                 if "data" in json_data and isinstance(json_data["data"], list):
-                    return {
+                    result = {
                         "records": [
                             {
                                 "exam": item.get("qualifiedExam", ""),
@@ -455,6 +675,9 @@ async def get_academic_percentage(request: Request, studtblId: str):
                             for item in json_data["data"]
                         ]
                     }
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
     except Exception as e:
         print(f"[AcadPct] Exception: {e}")
     
@@ -464,19 +687,26 @@ async def get_academic_percentage(request: Request, studtblId: str):
 #  PARENT DETAILS
 # ============================================================
 @app.get("/api/student/parent")
-async def get_parent_details(request: Request, studtblId: str):
+async def get_parent_details(request: Request, studtblId: str, response: Response):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentParentDetails"
     
+    # Cache check
+    cache_key = f"parent:{studtblId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
                 if "data" in json_data and json_data["data"]:
                     raw = json_data["data"]
-                    return {
+                    result = {
                         "father_name": raw.get("fatherName", ""),
                         "father_occupation": raw.get("fatherOccupation", ""),
                         "father_mobile": raw.get("fatherMobileNo", ""),
@@ -487,6 +717,9 @@ async def get_parent_details(request: Request, studtblId: str):
                         "guardian_occupation": raw.get("guardianOccupation", ""),
                         "guardian_mobile": raw.get("guardianMobileNo", "")
                     }
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
     except Exception as e:
         print(f"[Parent] Exception: {e}")
     
@@ -496,15 +729,25 @@ async def get_parent_details(request: Request, studtblId: str):
 #  REPORT MENU
 # ============================================================
 @app.get("/api/reports/menu")
-async def get_report_menu(request: Request):
+async def get_report_menu(request: Request, response: Response):
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Report/GetReportMenuWithSubCategories"
     
+    # Cache check
+    cache_key = "report_menu"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, headers=headers)
             if resp.status_code == 200:
-                return resp.json()
+                data = resp.json()
+                await response_cache.set(cache_key, data)
+                response.headers["Cache-Control"] = "public, max-age=60"
+                return data
     except Exception as e:
         print(f"[ReportMenu] Exception: {e}")
     
@@ -514,24 +757,34 @@ async def get_report_menu(request: Request):
 #  REPORT FILTERS
 # ============================================================
 @app.get("/api/reports/filters")
-async def get_report_filters(request: Request, reportSubId: int, studtblId: str):
+async def get_report_filters(request: Request, reportSubId: int, studtblId: str, response: Response):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Report/GetReportFilterByReportId"
     
+    # Cache check
+    cache_key = f"report_filters:{reportSubId}:{studtblId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"ReportSubId": reportSubId, "studtblId": studtblId}, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
                 if "data" in json_data and "semesterData" in json_data.get("data", {}):
                     semesters = json_data["data"]["semesterData"]
-                    return {
+                    result = {
                         "semesters": [
                             {"id": s.get("semesterId"), "name": s.get("semesterName", ""), "number": s.get("semesterNo", 0)}
                             for s in semesters
                         ]
                     }
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
     except Exception as e:
         print(f"[ReportFilter] Exception: {e}")
     
@@ -561,7 +814,7 @@ async def download_report(request: Request):
     async def try_download(payload: dict) -> Response | None:
         """Try a single download request, return Response on success or None."""
         try:
-            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(transport=request.app.state.transport, timeout=60.0, follow_redirects=True) as client:
                 resp = await client.post(upstream_url, json=payload, headers=headers)
                 ct = resp.headers.get('content-type', '').lower()
                 size = len(resp.content)
@@ -612,7 +865,7 @@ async def get_report(request: Request, studtblId: str, type: str):
     upstream_url = f"{base_url}/Report/GetReportFilterByReportId"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"ReportSubId": report_sub_id, "studtblId": studtblId}, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
@@ -639,7 +892,7 @@ async def get_report(request: Request, studtblId: str, type: str):
 # ============================================================
 
 @app.get("/api/attendance/course-detail")
-async def get_attendance_course_detail(request: Request, studtblId: str):
+async def get_attendance_course_detail(request: Request, studtblId: str, response: Response):
     studtblId = fix_id(studtblId)
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceCourseDetail"
@@ -647,8 +900,15 @@ async def get_attendance_course_detail(request: Request, studtblId: str):
     params["studtblId"] = studtblId
     inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
+    # Cache check
+    cache_key = f"att_course:{studtblId}:{inst_id}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport, timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             print(f"[AttCourse] {inst_id} status={resp.status_code}")
             if resp.status_code == 200:
@@ -665,17 +925,30 @@ async def get_attendance_course_detail(request: Request, studtblId: str):
                             "courseId": item.get("courseId") or item.get("id"),
                             "id": item.get("id") or item.get("courseId")
                         } for item in items]
-                        return {"success": True, "data": normalized}
-                    return {"success": True, "data": items}
+                        result = {"success": True, "data": normalized}
+                        await response_cache.set(cache_key, result)
+                        response.headers["Cache-Control"] = "public, max-age=60"
+                        return result
+                    
+                    result = {"success": True, "data": items}
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
                 elif isinstance(items, list):
-                    return {"success": True, "data": items}
-                return json_data if isinstance(json_data, dict) else {"success": True, "data": []}
+                    result = {"success": True, "data": items}
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
+                
+                result = json_data if isinstance(json_data, dict) else {"success": True, "data": []}
+                # Don't cache empty/weird unless sure
+                return result
     except Exception as e:
         print(f"[AttCourse] Exception: {e}")
     return {"error": "Failed to fetch course attendance"}
 
 @app.get("/api/attendance/daily-detail")
-async def get_attendance_daily_detail(request: Request, studtblId: str):
+async def get_attendance_daily_detail(request: Request, studtblId: str, response: Response):
     base_url, headers = get_institution_config(request)
     params = build_attendance_params(request)
     params["studtblId"] = fix_id(studtblId)
@@ -686,53 +959,91 @@ async def get_attendance_daily_detail(request: Request, studtblId: str):
         f"{base_url}/Student/GetStudentDailyAttendanceDetail",
     ]
 
+    # Cache check
+    cache_key = f"att_daily:{studtblId}:{inst_id}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            for upstream_url in endpoints:
-                resp = await client.get(upstream_url, params=params, headers=headers)
-                print(f"[AttDaily] {inst_id} {upstream_url.split('/')[-1]} status={resp.status_code}")
+        async with httpx.AsyncClient(transport=request.app.state.transport, timeout=15.0) as client:
+            # Parallel execution for fallback URLs
+            tasks = [client.get(url, params=params, headers=headers) for url in endpoints]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for i, resp in enumerate(results):
+                if isinstance(resp, Exception):
+                    print(f"[AttDaily] Request {i} failed: {resp}")
+                    continue
+                
+                print(f"[AttDaily] {inst_id} req={i} status={resp.status_code}")
                 if resp.status_code == 200:
                     json_data = resp.json()
                     data = _extract_attendance_data(json_data, inst_id)
-                    return {"success": True, "data": data}
+                    result = {"success": True, "data": data}
+                    await response_cache.set(cache_key, result)
+                    response.headers["Cache-Control"] = "public, max-age=60"
+                    return result
+                    
     except Exception as e:
         print(f"[AttDaily] Exception: {e}")
     return {"error": "Failed to fetch daily attendance"}
 
 @app.get("/api/attendance/overall-detail")
-async def get_attendance_overall_detail(request: Request, studtblId: str):
+async def get_attendance_overall_detail(request: Request, studtblId: str, response: Response):
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceOverAllDetail"
     params = build_attendance_params(request)
     params["studtblId"] = fix_id(studtblId)
 
+    # Cache check
+    cache_key = f"att_overall:{studtblId}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport, timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
                 data = _extract_attendance_data(json_data)
-                return {"success": True, "data": data}
+                result = {"success": True, "data": data}
+                await response_cache.set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=60"
+                return result
     except Exception as e:
         print(f"[AttOverall] Exception: {e}")
     return {"error": "Failed to fetch overall attendance"}
 
 @app.get("/api/attendance/leave-status")
-async def get_leave_status(request: Request, studtblId: str):
+async def get_leave_status(request: Request, studtblId: str, response: Response):
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetLeaveStatusByStudent"
     params = build_attendance_params(request)
     params["studtblId"] = fix_id(studtblId)
     inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
+    # Cache check
+    cache_key = f"att_leave:{studtblId}:{inst_id}"
+    cached = await response_cache.get(cache_key)
+    if cached:
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return cached
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport, timeout=15.0) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             print(f"[AttLeave] {inst_id} status={resp.status_code}")
             if resp.status_code == 200:
                 json_data = resp.json()
                 data = _extract_attendance_data(json_data, inst_id)
-                return {"success": True, "data": data}
+                result = {"success": True, "data": data}
+                await response_cache.set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=60"
+                return result
     except Exception as e:
         print(f"[AttLeave] Exception: {e}")
     return {"error": "Failed to fetch leave status"}
@@ -745,7 +1056,7 @@ async def get_inbox(request: Request, receiver_id: str):
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Inbox/GetUnreadCategories"
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
             resp = await client.get(upstream_url, params={"Receiver": receiver_id}, headers=headers)
             if resp.status_code == 200:
                 return resp.json()
