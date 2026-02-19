@@ -2,7 +2,7 @@ version: "1.0"
 project:
   name: "Sairam Student Dashboard Ultra-Neo"
   description: "High-performance, mobile-first Student Dashboard with Glassmorphism 2.0 aesthetics."
-  repository: "https://github.com/aravi/edumate"
+  repository: "https://github.com/AravindS2006/edumate"
 
 architecture:
   frontend:
