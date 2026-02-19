@@ -177,16 +177,17 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                     print(f"Failed to fetch student name for logging: {e}")
                     student_name = data.get("name", "Unknown")
 
-                # Log success
-                if sheets_logger:
-                    user_details = {
-                        "username": credentials.username,
-                        "name": student_name, 
-                        "status": "Success",
-                        "ip": client_ip,
-                        "institution": base_url
-                    }
-                    background_tasks.add_task(sheets_logger.log_login, user_details)
+                # Log success (Stdout for Vercel)
+                log_entry = {
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "login_success",
+                    "username": credentials.username,
+                    "name": student_name, 
+                    "status": "Success",
+                    "ip": client_ip,
+                    "institution": base_url
+                }
+                print(json.dumps(log_entry))
 
                 return {
                     "token": data.get("idToken"),
@@ -195,24 +196,25 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                 }
             else:
                 print(f"Upstream Error: {response.text}")
-                if sheets_logger:
-                    background_tasks.add_task(sheets_logger.log_login, {
-                        "username": credentials.username,
-                        "status": f"Failed: {response.status_code}",
-                        "ip": client_ip
-                    })
+                # Log Failure
+                print(json.dumps({
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "event": "login_failed",
+                    "username": credentials.username,
+                    "status": f"Failed: {response.status_code}",
+                    "ip": client_ip
+                }))
                 response.raise_for_status()
-
-
 
     except Exception as e:
         print(f"Upstream login failed: {e}")
-        if sheets_logger:
-                background_tasks.add_task(sheets_logger.log_login, {
-                "username": credentials.username,
-                "status": f"Exception: {str(e)}",
-                "ip": client_ip
-            })
+        print(json.dumps({
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "event": "login_exception",
+            "username": credentials.username,
+            "status": f"Exception: {str(e)}",
+            "ip": client_ip
+        }))
 
     # Fallback Mock for Dev
     if credentials.username == "test":
@@ -233,9 +235,7 @@ async def get_logs(secret: str = Query(..., description="Secret key to access lo
     if secret != LOGS_SECRET_KEY:
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    if sheets_logger:
-        return sheets_logger.get_logs(limit)
-    return {"error": "Logger not initialized"}
+    return {"message": "Logs are now available in Vercel Dashboard directly. Stdout logging enabled."}
 
 def fix_id(studtblId: str) -> str:
     """Ensure + and = are not corrupted by URL encoding."""
@@ -289,7 +289,7 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
                 content=resp.content,
                 media_type=content_type,
                 status_code=200,
-                headers={"Cache-Control": "public, max-age=3600"}
+                headers={"Cache-Control": "public, max-age=86400, s-maxage=86400"}
             )
         else:
             print(f"[Image] Failed: {resp.text[:200]}")
@@ -311,6 +311,7 @@ async def get_dashboard_stats(request: Request, studtblId: str, response: Respon
     cache_key = f"dashboard:{studtblId}"
     cached = await response_cache.get(cache_key)
     if cached:
+        response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
         return cached
 
     try:
@@ -354,7 +355,7 @@ async def get_dashboard_stats(request: Request, studtblId: str, response: Respon
             
             # Set Cache
             await response_cache.set(cache_key, stats)
-            response.headers["Cache-Control"] = "public, max-age=60"
+            response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
             return stats
         else:
             print(f"[Dashboard] Error: {resp.text[:200]}")
@@ -376,7 +377,7 @@ async def get_academic_details(request: Request, studtblId: str, response: Respo
     cache_key = f"academic:{studtblId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
         return cached
 
     try:
@@ -410,7 +411,7 @@ async def get_academic_details(request: Request, studtblId: str, response: Respo
                     "academic_batch_id": raw.get("academicBatchId") or raw.get("academic_batch_id", 0)
                 }
                 await response_cache.set(cache_key, result)
-                response.headers["Cache-Control"] = "public, max-age=60"
+                response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
                 return result
     except Exception as e:
         print(f"[Academic] Exception: {e}")
@@ -429,7 +430,7 @@ async def get_personal_details(request: Request, studtblId: str, response: Respo
     cache_key = f"personal:{studtblId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
         return cached
 
     try:
@@ -455,7 +456,7 @@ async def get_personal_details(request: Request, studtblId: str, response: Respo
                     "age": raw.get("currentAge", "")
                 }
                 await response_cache.set(cache_key, result)
-                response.headers["Cache-Control"] = "public, max-age=60"
+                response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
                 return result
             else:
                 print(f"[Personal] Error: {resp.text[:200]}")
@@ -484,7 +485,7 @@ async def get_full_student_profile(request: Request, studtblId: str, response: R
     cache_key = f"full_profile:{studtblId}:{inst_id}:sem{semesterId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
         return cached
 
     endpoints = {
@@ -587,7 +588,7 @@ async def get_full_student_profile(request: Request, studtblId: str, response: R
         
         # Cache the result
         await response_cache.set(cache_key, aggregated_data)
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
         return aggregated_data
 
     except Exception as e:
@@ -619,7 +620,7 @@ async def get_exam_status(request: Request, studtblId: str, response: Response,
     cache_key = f"exam_status:{studtblId}:{academicYearId}:{semesterId}:{yearOfStudyId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
         return cached
 
     try:
@@ -642,7 +643,7 @@ async def get_exam_status(request: Request, studtblId: str, response: Response,
                         "od_pct": raw.get("odPercentage", 0)
                     }
                     await response_cache.set(cache_key, result)
-                    response.headers["Cache-Control"] = "public, max-age=60"
+                    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
                     return result
     except Exception as e:
         print(f"[ExamStatus] Exception: {e}")
@@ -662,7 +663,7 @@ async def get_academic_percentage(request: Request, studtblId: str, response: Re
     cache_key = f"acad_pct:{studtblId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
         return cached
 
     try:
@@ -684,7 +685,7 @@ async def get_academic_percentage(request: Request, studtblId: str, response: Re
                         ]
                     }
                     await response_cache.set(cache_key, result)
-                    response.headers["Cache-Control"] = "public, max-age=60"
+                    response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
                     return result
     except Exception as e:
         print(f"[AcadPct] Exception: {e}")
@@ -704,7 +705,7 @@ async def get_parent_details(request: Request, studtblId: str, response: Respons
     cache_key = f"parent:{studtblId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
         return cached
 
     try:
@@ -726,7 +727,7 @@ async def get_parent_details(request: Request, studtblId: str, response: Respons
                         "guardian_mobile": raw.get("guardianMobileNo", "")
                     }
                     await response_cache.set(cache_key, result)
-                    response.headers["Cache-Control"] = "public, max-age=60"
+                    response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
                     return result
     except Exception as e:
         print(f"[Parent] Exception: {e}")
@@ -745,7 +746,7 @@ async def get_report_menu(request: Request, response: Response):
     cache_key = "report_menu"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
         return cached
 
     try:
@@ -754,7 +755,7 @@ async def get_report_menu(request: Request, response: Response):
         if resp.status_code == 200:
             data = resp.json()
             await response_cache.set(cache_key, data)
-            response.headers["Cache-Control"] = "public, max-age=60"
+            response.headers["Cache-Control"] = "public, max-age=86400, s-maxage=86400"
             return data
     except Exception as e:
         print(f"[ReportMenu] Exception: {e}")
@@ -774,7 +775,7 @@ async def get_report_filters(request: Request, reportSubId: int, studtblId: str,
     cache_key = f"report_filters:{reportSubId}:{studtblId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
         return cached
 
     try:
@@ -791,7 +792,7 @@ async def get_report_filters(request: Request, reportSubId: int, studtblId: str,
                     ]
                 }
                 await response_cache.set(cache_key, result)
-                response.headers["Cache-Control"] = "public, max-age=60"
+                response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=3600"
                 return result
     except Exception as e:
         print(f"[ReportFilter] Exception: {e}")
@@ -916,7 +917,7 @@ async def get_attendance_course_detail(request: Request, studtblId: str, respons
     cache_key = f"att_course:{studtblId}:{inst_id}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
         return cached
 
     try:
@@ -938,17 +939,17 @@ async def get_attendance_course_detail(request: Request, studtblId: str, respons
                     } for item in items]
                     result = {"success": True, "data": normalized}
                     await response_cache.set(cache_key, result)
-                    response.headers["Cache-Control"] = "public, max-age=60"
+                    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
                     return result
                 
                 result = {"success": True, "data": items}
                 await response_cache.set(cache_key, result)
-                response.headers["Cache-Control"] = "public, max-age=60"
+                response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
                 return result
             elif isinstance(items, list):
                 result = {"success": True, "data": items}
                 await response_cache.set(cache_key, result)
-                response.headers["Cache-Control"] = "public, max-age=60"
+                response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
                 return result
             
             result = json_data if isinstance(json_data, dict) else {"success": True, "data": []}
@@ -974,7 +975,7 @@ async def get_attendance_daily_detail(request: Request, studtblId: str, response
     cache_key = f"att_daily:{studtblId}:{inst_id}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
         return cached
 
     try:
@@ -994,7 +995,7 @@ async def get_attendance_daily_detail(request: Request, studtblId: str, response
                     data = _extract_attendance_data(json_data, inst_id)
                     result = {"success": True, "data": data}
                     await response_cache.set(cache_key, result)
-                    response.headers["Cache-Control"] = "public, max-age=60"
+                    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
                     return result
                     
     except Exception as e:
@@ -1012,7 +1013,7 @@ async def get_attendance_overall_detail(request: Request, studtblId: str, respon
     cache_key = f"att_overall:{studtblId}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
         return cached
 
     try:
@@ -1023,7 +1024,7 @@ async def get_attendance_overall_detail(request: Request, studtblId: str, respon
             data = _extract_attendance_data(json_data)
             result = {"success": True, "data": data}
             await response_cache.set(cache_key, result)
-            response.headers["Cache-Control"] = "public, max-age=60"
+            response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
             return result
     except Exception as e:
         print(f"[AttOverall] Exception: {e}")
@@ -1041,7 +1042,7 @@ async def get_leave_status(request: Request, studtblId: str, response: Response)
     cache_key = f"att_leave:{studtblId}:{inst_id}"
     cached = await response_cache.get(cache_key)
     if cached:
-        response.headers["Cache-Control"] = "public, max-age=60"
+        response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
         return cached
 
     try:
@@ -1053,7 +1054,7 @@ async def get_leave_status(request: Request, studtblId: str, response: Response)
             data = _extract_attendance_data(json_data, inst_id)
             result = {"success": True, "data": data}
             await response_cache.set(cache_key, result)
-            response.headers["Cache-Control"] = "public, max-age=60"
+            response.headers["Cache-Control"] = "public, max-age=600, s-maxage=600"
             return result
     except Exception as e:
         print(f"[AttLeave] Exception: {e}")
