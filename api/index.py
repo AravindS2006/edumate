@@ -433,30 +433,30 @@ async def get_personal_details(request: Request, studtblId: str, response: Respo
         return cached
 
     try:
-        async with httpx.AsyncClient(transport=request.app.state.transport) as client:
-            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
-            if resp.status_code == 200:
-                json_data = resp.json()
-                if "data" in json_data and json_data["data"]:
-                    raw = json_data["data"]
-                    result = {
-                        "name": raw.get("studentName", ""),
-                        "reg_no": raw.get("studRollNo", ""),
-                        "photo_id": raw.get("photoDocumentId", ""),
-                        "email": raw.get("officialEmailid", ""),
-                        "date_of_birth": raw.get("dateOfBirth", ""),
-                        "gender": raw.get("gender", ""),
-                        "community": raw.get("community", ""),
-                        "religion": raw.get("religion", ""),
-                        "mobile": raw.get("mobileNo", ""),
-                        "bus_route": raw.get("busRoute", ""),
-                        "hostel": raw.get("isHostel", False),
-                        "languages": raw.get("languageKnown", ""),
-                        "age": raw.get("currentAge", "")
-                    }
-                    await response_cache.set(cache_key, result)
-                    response.headers["Cache-Control"] = "public, max-age=60"
-                    return result
+        client = request.app.state.client
+        resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+        if resp.status_code == 200:
+            json_data = resp.json()
+            if "data" in json_data and json_data["data"]:
+                raw = json_data["data"]
+                result = {
+                    "name": raw.get("studentName", ""),
+                    "reg_no": raw.get("studRollNo", ""),
+                    "photo_id": raw.get("photoDocumentId", ""),
+                    "email": raw.get("officialEmailid", ""),
+                    "date_of_birth": raw.get("dateOfBirth", ""),
+                    "gender": raw.get("gender", ""),
+                    "community": raw.get("community", ""),
+                    "religion": raw.get("religion", ""),
+                    "mobile": raw.get("mobileNo", ""),
+                    "bus_route": raw.get("busRoute", ""),
+                    "hostel": raw.get("isHostel", False),
+                    "languages": raw.get("languageKnown", ""),
+                    "age": raw.get("currentAge", "")
+                }
+                await response_cache.set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=60"
+                return result
             else:
                 print(f"[Personal] Error: {resp.text[:200]}")
     except Exception as e:
@@ -920,41 +920,40 @@ async def get_attendance_course_detail(request: Request, studtblId: str, respons
         return cached
 
     try:
-        async with httpx.AsyncClient(transport=request.app.state.transport, timeout=15.0) as client:
-            resp = await client.get(upstream_url, params=params, headers=headers)
-            print(f"[AttCourse] {inst_id} status={resp.status_code}")
-            if resp.status_code == 200:
-                json_data = resp.json()
-                items = _extract_attendance_data(json_data, inst_id)
+        client = request.app.state.client
+        resp = await client.get(upstream_url, params=params, headers=headers)
+        if resp.status_code == 200:
+            json_data = resp.json()
+            items = _extract_attendance_data(json_data, inst_id)
 
-                if isinstance(items, list) and len(items) > 0:
-                    is_sit = inst_id == "SIT" or ("courseCode" in items[0] and "attendancePercentage" in items[0]) or "subjectCode" in items[0] or "courseName" in items[0]
-                    if is_sit:
-                        normalized = [{
-                            "courseCode": item.get("subjectCode") or item.get("courseCode", ""),
-                            "courseName": item.get("subjectName") or item.get("courseName", ""),
-                            "attendancePercentage": item.get("attendancePercentage") or item.get("percentage") or item.get("p_Percentage") or 0,
-                            "courseId": item.get("courseId") or item.get("id"),
-                            "id": item.get("id") or item.get("courseId")
-                        } for item in items]
-                        result = {"success": True, "data": normalized}
-                        await response_cache.set(cache_key, result)
-                        response.headers["Cache-Control"] = "public, max-age=60"
-                        return result
-                    
-                    result = {"success": True, "data": items}
-                    await response_cache.set(cache_key, result)
-                    response.headers["Cache-Control"] = "public, max-age=60"
-                    return result
-                elif isinstance(items, list):
-                    result = {"success": True, "data": items}
+            if isinstance(items, list) and len(items) > 0:
+                is_sit = inst_id == "SIT" or ("courseCode" in items[0] and "attendancePercentage" in items[0]) or "subjectCode" in items[0] or "courseName" in items[0]
+                if is_sit:
+                    normalized = [{
+                        "courseCode": item.get("subjectCode") or item.get("courseCode", ""),
+                        "courseName": item.get("subjectName") or item.get("courseName", ""),
+                        "attendancePercentage": item.get("attendancePercentage") or item.get("percentage") or item.get("p_Percentage") or 0,
+                        "courseId": item.get("courseId") or item.get("id"),
+                        "id": item.get("id") or item.get("courseId")
+                    } for item in items]
+                    result = {"success": True, "data": normalized}
                     await response_cache.set(cache_key, result)
                     response.headers["Cache-Control"] = "public, max-age=60"
                     return result
                 
-                result = json_data if isinstance(json_data, dict) else {"success": True, "data": []}
-                # Don't cache empty/weird unless sure
+                result = {"success": True, "data": items}
+                await response_cache.set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=60"
                 return result
+            elif isinstance(items, list):
+                result = {"success": True, "data": items}
+                await response_cache.set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=60"
+                return result
+            
+            result = json_data if isinstance(json_data, dict) else {"success": True, "data": []}
+            # Don't cache empty/weird unless sure
+            return result
     except Exception as e:
         print(f"[AttCourse] Exception: {e}")
     return {"error": "Failed to fetch course attendance"}
