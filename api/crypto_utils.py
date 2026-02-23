@@ -6,9 +6,13 @@ from Crypto.Util.Padding import pad, unpad
 KEY_BASE64 = "9vcPlytFC4ck0X0gvm+Y6+m0vgCAnq0xDFd3X6pBijtozwmOjntoUCwzpSxLZ0GP2PtDkkJERESxdG1bdt8w=="
 
 def get_cipher():
-    key = hashlib.sha256(KEY_BASE64.encode('utf-8')).digest()
-    cipher = AES.new(key, AES.MODE_ECB)
-    return cipher
+    global _CIPHER_CACHE
+    if _CIPHER_CACHE is None:
+        key = hashlib.sha256(KEY_BASE64.encode('utf-8')).digest()
+        _CIPHER_CACHE = AES.new(key, AES.MODE_ECB)
+    return _CIPHER_CACHE
+
+_CIPHER_CACHE = None
 
 def encrypt_data(data: str) -> str:
     cipher = get_cipher()
