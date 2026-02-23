@@ -15,17 +15,16 @@ export default function Home() {
 
   // Pre-warm the Render backend while user types credentials (avoids cold start delay on login)
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    fetch(`${apiUrl}/api/health`).catch(() => { });
+    fetch('/api/health').catch(() => { });
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
     try {
-      const res = await fetch(`${API_URL}/api/login`, {
+      // Uses relative URL — Vercel rewrites proxy /api/* to the Render backend server-side (no CORS issues)
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -87,8 +87,8 @@ interface ParentData {
 
 /* ─────────────────────────────── Constants ─────────────────────────── */
 
-// Backend API URL — set NEXT_PUBLIC_API_URL to your Render backend URL in production
-const API = process.env.NEXT_PUBLIC_API_URL || '';
+// All API calls use relative /api/* paths — Vercel rewrites proxy them to the Render backend
+const API = '';
 
 const stagger = {
     hidden: {},
