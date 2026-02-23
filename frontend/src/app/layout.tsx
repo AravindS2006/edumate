@@ -127,6 +127,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Preconnect to Render backend for faster API calls */}
+        <link rel="preconnect" href="https://edumate-1-7nj8.onrender.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://edumate-1-7nj8.onrender.com" />
+        {/* Preload LCP image */}
+        <link rel="preload" href="/assets/SAIRAM-ROUND-LOGO.png" as="image" type="image/png" fetchPriority="high" />
+      </head>
       <body className={plusJakarta.className}>
         <script
           type="application/ld+json"
