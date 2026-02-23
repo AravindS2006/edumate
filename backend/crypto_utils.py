@@ -21,9 +21,13 @@ def get_cipher():
     # "LOGIC: SHA-256 hash of KEY_BASE64 -> AES-ECB Mode -> Pkcs7 Padding."
     # I will assume it means hashing the original base64 string directly as bytes.
     
-    key = hashlib.sha256(KEY_BASE64.encode('utf-8')).digest()
-    cipher = AES.new(key, AES.MODE_ECB)
-    return cipher
+    global _CIPHER_CACHE
+    if _CIPHER_CACHE is None:
+        key = hashlib.sha256(KEY_BASE64.encode('utf-8')).digest()
+        _CIPHER_CACHE = AES.new(key, AES.MODE_ECB)
+    return _CIPHER_CACHE
+
+_CIPHER_CACHE = None
 
 def encrypt_data(data: str) -> str:
     cipher = get_cipher()
