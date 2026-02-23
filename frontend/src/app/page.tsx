@@ -1,21 +1,28 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Lock, ArrowRight, Loader2, Mail } from 'lucide-react';
 import Image from 'next/image';
+
+// Lazy-load framer-motion — not needed for initial paint
+const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
+const MotionButton = dynamic(() => import('framer-motion').then(m => m.motion.button), { ssr: false });
 
 export default function Home() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [institution, setInstitution] = useState('SEC');
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
-  // Pre-warm the Render backend while user types credentials (avoids cold start delay on login)
   useEffect(() => {
+    // Pre-warm the Render backend while user types credentials
     fetch('/api/health').catch(() => { });
+    // Trigger entrance animation after hydration
+    setMounted(true);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -23,7 +30,6 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Uses relative URL — Vercel rewrites proxy /api/* to the Render backend server-side (no CORS issues)
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: {
@@ -46,7 +52,7 @@ export default function Home() {
         if (data.token) localStorage.setItem('token', data.token);
         if (data.studtblId) localStorage.setItem('studtblId', data.studtblId);
         if (data.access_token) localStorage.setItem('token', data.access_token);
-        localStorage.setItem('institutionId', institution); // Store selected institution
+        localStorage.setItem('institutionId', institution);
 
         if (!data.studtblId && !data.token && !data.access_token) {
           console.warn("No token/id found in response");
@@ -73,23 +79,14 @@ export default function Home() {
         <div className="absolute top-[40%] left-[40%] w-[25%] h-[25%] bg-violet-100/30 rounded-full blur-[100px]"></div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="z-10 w-full max-w-md"
+      {/* Card — visible immediately with CSS animation, no opacity:0 blocking LCP */}
+      <div
+        className={`z-10 w-full max-w-md transition-all duration-700 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-100 translate-y-0'}`}
       >
         <div className="glass-card flex flex-col items-center">
 
-
-
-          {/* ── College Logo ── */}
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="mb-6"
-          >
+          {/* ── College Logo — LCP element, visible immediately ── */}
+          <div className="mb-6">
             <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-lg shadow-indigo-100 ring-4 ring-indigo-50 overflow-hidden">
               <Image
                 src="/assets/SAIRAM-ROUND-LOGO.png"
@@ -101,20 +98,15 @@ export default function Home() {
                 fetchPriority="high"
               />
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="text-center mb-6"
-          >
+          {/* ── Title — also visible immediately for LCP ── */}
+          <div className="text-center mb-6">
             <h1 className="text-3xl font-extrabold mb-1 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600">
               EduMate
             </h1>
-
             <p className="text-slate-600 mt-3 text-sm">Sign in to your student portal</p>
-          </motion.div>
+          </div>
 
           <form onSubmit={handleLogin} className="w-full space-y-4">
 
@@ -168,12 +160,10 @@ export default function Home() {
               />
             </div>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               type="submit"
               disabled={loading}
-              className="glass-button w-full flex items-center justify-center mt-6 group"
+              className="glass-button w-full flex items-center justify-center mt-6 group hover:scale-[1.02] active:scale-[0.98] transition-transform"
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={20} />
@@ -183,25 +173,18 @@ export default function Home() {
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
-            </motion.button>
+            </button>
           </form>
 
-          {/* ── Sairam Footer Branding ── */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.6 }}
-            className="mt-8 w-full space-y-3"
-          >
-
-
+          {/* ── Footer Branding ── */}
+          <div className="mt-8 w-full space-y-3">
             <div className="text-center space-y-1 pt-1">
               <p className="text-xs text-slate-500 font-semibold">Protected by AES-256 Encryption</p>
               <p className="text-[10px] text-slate-500">© {new Date().getFullYear()} EduMate</p>
             </div>
-          </motion.div>
+          </div>
         </div>
-      </motion.div>
+      </div>
     </main>
   );
 }
