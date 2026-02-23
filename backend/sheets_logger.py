@@ -118,7 +118,9 @@ class SheetsLogger:
             return
 
         try:
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Use Indian Standard Time (IST = UTC + 5:30)
+            ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+            timestamp = datetime.datetime.now(ist).strftime("%Y-%m-%d %I:%M:%S %p")
             row = [
                 timestamp,
                 user_data.get("username", "N/A"),
