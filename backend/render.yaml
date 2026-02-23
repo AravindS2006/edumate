@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: edumate-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    repo: https://github.com/AravindS2006/edumate
+    branch: main
+    rootDir: backend
+    plan: free
+    envVars:
+      - key: GOOGLE_CREDENTIALS
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

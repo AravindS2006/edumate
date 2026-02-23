@@ -87,7 +87,7 @@ interface ParentData {
 
 /* ─────────────────────────────── Constants ─────────────────────────── */
 
-// Use relative URLs so Next.js rewrites proxy to backend (avoids CORS)
+// All API calls use relative /api/* paths — Vercel rewrites proxy them to the Render backend
 const API = '';
 
 const stagger = {
@@ -338,10 +338,10 @@ export default function Dashboard() {
 
             try {
                 const [dailyRes, leaveRes, courseRes, examRes] = await Promise.all([
-                    fetch(`/api/attendance/daily-detail?${params}`, { headers }),
-                    fetch(`/api/attendance/leave-status?${params}`, { headers }),
-                    fetch(`/api/attendance/course-detail?${params}`, { headers }),
-                    fetch(`/api/student/exam-status?${params}`, { headers })
+                    fetch(`${API}/api/attendance/daily-detail?${params}`, { headers }),
+                    fetch(`${API}/api/attendance/leave-status?${params}`, { headers }),
+                    fetch(`${API}/api/attendance/course-detail?${params}`, { headers }),
+                    fetch(`${API}/api/student/exam-status?${params}`, { headers })
                 ]);
 
                 const errors: string[] = [];

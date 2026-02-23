@@ -1,5 +1,5 @@
 fastapi
-uvicorn
+uvicorn[standard]
 httpx
 pycryptodome
 python-multipart
@@ -7,3 +7,4 @@ pydantic
 requests
 gspread
 oauth2client
+gunicorn

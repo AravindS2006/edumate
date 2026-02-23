@@ -3,19 +3,12 @@
         {
             "src": "frontend/package.json",
             "use": "@vercel/next"
-        },
-        {
-            "src": "api/index.py",
-            "use": "@vercel/python",
-            "config": {
-                "maxDuration": 30
-            }
         }
     ],
     "routes": [
         {
             "src": "/api/(.*)",
-            "dest": "/api/index.py"
+            "dest": "https://edumate-1-7nj8.onrender.com/api/$1"
         },
         {
             "src": "/(.*)",
