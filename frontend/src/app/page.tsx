@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Lock, ArrowRight, Loader2, Mail } from 'lucide-react';
@@ -13,13 +13,19 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Pre-warm the Render backend while user types credentials (avoids cold start delay on login)
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    fetch(`${apiUrl}/api/health`).catch(() => { });
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
     try {
-      // Use relative URL so Next.js rewrites proxy to backend (avoids CORS, works with proxy)
-      const res = await fetch('/api/login', {
+      const res = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

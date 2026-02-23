@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import httpx
 import json
 import asyncio
+import os
 from crypto_utils import encrypt_data, decrypt_data
 from sheets_logger import sheets_logger
 
@@ -17,10 +18,9 @@ app = FastAPI()
 async def health_check():
     return {"status": "ok", "message": "Backend is running"}
 
-# Allow CORS
-origins = [
-    "*"
-]
+# Allow CORS — read allowed origins from FRONTEND_URL env var
+frontend_url = os.environ.get("FRONTEND_URL", "")
+origins = [frontend_url] if frontend_url else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -843,4 +843,5 @@ async def get_inbox(request: Request, receiver_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

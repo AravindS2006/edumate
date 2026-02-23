@@ -87,8 +87,8 @@ interface ParentData {
 
 /* ─────────────────────────────── Constants ─────────────────────────── */
 
-// Use relative URLs so Next.js rewrites proxy to backend (avoids CORS)
-const API = '';
+// Backend API URL — set NEXT_PUBLIC_API_URL to your Render backend URL in production
+const API = process.env.NEXT_PUBLIC_API_URL || '';
 
 const stagger = {
     hidden: {},
@@ -338,10 +338,10 @@ export default function Dashboard() {
 
             try {
                 const [dailyRes, leaveRes, courseRes, examRes] = await Promise.all([
-                    fetch(`/api/attendance/daily-detail?${params}`, { headers }),
-                    fetch(`/api/attendance/leave-status?${params}`, { headers }),
-                    fetch(`/api/attendance/course-detail?${params}`, { headers }),
-                    fetch(`/api/student/exam-status?${params}`, { headers })
+                    fetch(`${API}/api/attendance/daily-detail?${params}`, { headers }),
+                    fetch(`${API}/api/attendance/leave-status?${params}`, { headers }),
+                    fetch(`${API}/api/attendance/course-detail?${params}`, { headers }),
+                    fetch(`${API}/api/student/exam-status?${params}`, { headers })
                 ]);
 
                 const errors: string[] = [];
