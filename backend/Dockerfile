@@ -12,6 +12,9 @@ COPY main.py .
 COPY crypto_utils.py .
 COPY sheets_logger.py .
 
+# Prevent memory fragmentation on glibc systems (especially crucial for 512MB limits on Render)
+ENV MALLOC_ARENA_MAX=2
+
 # Expose port (Render uses $PORT env var)
 EXPOSE 8000
 
