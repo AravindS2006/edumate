@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import httpx
 import json
 import asyncio
+from contextlib import asynccontextmanager
 import os
 from crypto_utils import encrypt_data, decrypt_data
 from sheets_logger import sheets_logger
@@ -12,7 +13,19 @@ from sheets_logger import sheets_logger
 # SECRET KEY for accessing logs
 LOGS_SECRET_KEY = "edumate_admin_secret"
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    limits = httpx.Limits(max_keepalive_connections=20, max_connections=40)
+    app.state.client = httpx.AsyncClient(limits=limits, timeout=20.0, verify=False)
+    yield
+    await app.state.client.aclose()
+
+@asynccontextmanager
+async def get_client(request: Request):
+    yield request.app.state.client
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/api/health")
 async def health_check():
@@ -93,7 +106,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
 
     client_ip = request.client.host if request.client else "Unknown"
     
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with get_client(request) as client:
         try:
             response = await client.post(f"{base_url}/User/Login", json=payload, headers=headers)
             
@@ -196,7 +209,7 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
     
     
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"documentId": documentId, "studtblId": studtblId}, headers=headers)
             
             if resp.status_code == 200:
@@ -226,7 +239,7 @@ async def get_dashboard_stats(request: Request, studtblId: str):
     upstream_url = f"{base_url}/Dashboard/GetStudentDashboardDetails"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             
             if resp.status_code == 200:
@@ -280,7 +293,7 @@ async def get_academic_details(request: Request, studtblId: str):
     upstream_url = f"{base_url}/Student/GetStudentAcademicDetails"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             
             if resp.status_code == 200:
@@ -324,7 +337,7 @@ async def get_personal_details(request: Request, studtblId: str):
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentPersonalDetails"
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
@@ -383,7 +396,7 @@ async def get_exam_status(request: Request, studtblId: str,
     }
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             
             if resp.status_code == 200:
@@ -445,7 +458,7 @@ async def get_academic_percentage(request: Request, studtblId: str):
     upstream_url = f"{base_url}/Student/GetStudentAcademicPercentage"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             
             if resp.status_code == 200:
@@ -476,7 +489,7 @@ async def get_parent_details(request: Request, studtblId: str):
     upstream_url = f"{base_url}/Student/GetStudentParentDetails"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
@@ -507,7 +520,7 @@ async def get_report_menu(request: Request):
     upstream_url = f"{base_url}/Report/GetReportMenuWithSubCategories"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, headers=headers)
             if resp.status_code == 200:
                 return resp.json()
@@ -526,7 +539,7 @@ async def get_report_filters(request: Request, reportSubId: int, studtblId: str)
     upstream_url = f"{base_url}/Report/GetReportFilterByReportId"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"ReportSubId": reportSubId, "studtblId": studtblId}, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
@@ -566,7 +579,7 @@ async def download_report(request: Request):
     async def try_download(payload: dict) -> Response | None:
         """Try a single download request, return Response on success or None."""
         try:
-            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            async with get_client(request) as client:
                 resp = await client.post(upstream_url, json=payload, headers=headers)
                 ct = resp.headers.get('content-type', '').lower()
                 size = len(resp.content)
@@ -623,7 +636,7 @@ async def get_report(request: Request, studtblId: str, type: str):
     upstream_url = f"{base_url}/Report/GetReportFilterByReportId"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"ReportSubId": report_sub_id, "studtblId": studtblId}, headers=headers)
             
             if resp.status_code == 200:
@@ -684,7 +697,7 @@ async def get_attendance_course_detail(request: Request, studtblId: str):
     inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
@@ -723,7 +736,7 @@ async def get_attendance_daily_detail(request: Request, studtblId: str):
     ]
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with get_client(request) as client:
             for upstream_url in endpoints:
                 resp = await client.get(upstream_url, params=params, headers=headers)
                 if resp.status_code == 200:
@@ -754,7 +767,7 @@ async def get_attendance_overall_detail(request: Request, studtblId: str):
     params["studtblId"] = fix_id(studtblId)
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
@@ -773,7 +786,7 @@ async def get_leave_status(request: Request, studtblId: str):
     inst_id = request.headers.get("X-Institution-Id", "SEC").upper()
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
             if resp.status_code == 200:
                 json_data = resp.json()
@@ -792,7 +805,7 @@ async def get_inbox(request: Request, receiver_id: str):
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Inbox/GetUnreadCategories"
     try:
-        async with httpx.AsyncClient() as client:
+        async with get_client(request) as client:
             resp = await client.get(upstream_url, params={"Receiver": receiver_id}, headers=headers)
             if resp.status_code == 200:
                 return resp.json()
