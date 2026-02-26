@@ -797,6 +797,7 @@ async def get_leave_status(request: Request, studtblId: str):
     return {"error": "Failed to fetch leave status"}
 
 # ============================================================
+# ============================================================
 #  INBOX
 # ============================================================
 
@@ -813,6 +814,73 @@ async def get_inbox(request: Request, receiver_id: str):
         pass
         
     return {"unread_count": 0, "categories": []}
+
+# ============================================================
+#  USER PROFILE
+# ============================================================
+
+@app.get("/api/profile/identifiers")
+async def get_identifiers(request: Request, studtblId: str):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentIdentifiersById"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/profile/achievements/studies")
+async def get_achievement_studies(request: Request, studtblId: str):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Achievements/GetAchievementStudies"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/profile/achievements/nptel")
+async def get_achievement_nptel(request: Request, studtblId: str):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Achievements/GetNPTELSemesterList"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/profile/achievements/amcat")
+async def get_achievement_amcat(request: Request, studtblId: str):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Achievements/GetAmcatPgpaHeaderList"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/profile/course-details")
+async def get_course_details(request: Request, studtblId: str, regulationId: str, branchId: str, semesterId: str, pageNumber: str = "1", pageSize: str = "100"):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentCourseDetails"
+    params = {
+        "studtblId": studtblId,
+        "regulationId": regulationId,
+        "branchId": branchId,
+        "semesterId": semesterId,
+        "pageNumber": pageNumber,
+        "pageSize": pageSize
+    }
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
