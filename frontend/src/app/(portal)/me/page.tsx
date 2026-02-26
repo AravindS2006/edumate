@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Phone, Mail, MapPin, Calendar, BookOpen, GraduationCap, Award, FileText, Activity, Users } from 'lucide-react';
 import { ProfileImage } from '@/components/ProfileImage';
+import CampusConnectTab from '@/app/dashboard/profile_components/CampusConnectTab';
+import AchievementsTab from '@/app/dashboard/profile_components/AchievementsTab';
+import CourseDetailsTab from '@/app/dashboard/profile_components/CourseDetailsTab';
+import AttendanceLogTab from '@/app/dashboard/profile_components/AttendanceLogTab';
+
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -133,10 +138,10 @@ export default function ProfilePage() {
                         transition={{ duration: 0.2 }}
                     >
                         {activeTab === 'profile' && <ProfileOverviewTab personal={personal} academic={academic} parent={parent} />}
-                        {activeTab === 'connect' && <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">Campus Connect moved to Dashboard.</div>}
-                        {activeTab === 'achievements' && <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">Achievements moved to Dashboard.</div>}
-                        {activeTab === 'courses' && <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">Course Details moved to Dashboard.</div>}
-                        {activeTab === 'attendance' && <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">Attendance Log moved to Dashboard.</div>}
+                        {activeTab === 'connect' && <CampusConnectTab studtblId={localStorage.getItem('studtblId') || ''} />}
+                        {activeTab === 'achievements' && <AchievementsTab studtblId={localStorage.getItem('studtblId') || ''} />}
+                        {activeTab === 'courses' && <CourseDetailsTab studtblId={localStorage.getItem('studtblId') || ''} academic={academic} />}
+                        {activeTab === 'attendance' && <AttendanceLogTab studtblId={localStorage.getItem('studtblId') || ''} academic={academic} />}
                     </motion.div>
                 </AnimatePresence>
             </div>

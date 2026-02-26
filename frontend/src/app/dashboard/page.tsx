@@ -18,9 +18,9 @@ import Image from 'next/image';
 // New Profile Subcomponents
 import CampusConnectTab from './profile_components/CampusConnectTab';
 import AchievementsTab from './profile_components/AchievementsTab';
-import CourseDetailsTab from './profile_components/CourseDetailsTab';
-import AttendanceLogTab from './profile_components/AttendanceLogTab';
+import ProfileOverviewTab from './profile_components/ProfileOverviewTab';
 import { ProfileImage } from '@/components/ProfileImage';
+
 
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -128,6 +128,7 @@ export default function Dashboard() {
     const [personal, setPersonal] = useState<PersonalData | null>(null);
     const [acadPct, setAcadPct] = useState<AcademicPercentage | null>(null);
     const [parentData, setParentData] = useState<ParentData | null>(null);
+    const [identifiers, setIdentifiers] = useState<any>(null);
 
     // Initial loading state can be false if we have cached data
     const [loading, setLoading] = useState(true);
@@ -182,21 +183,23 @@ export default function Dashboard() {
         const fetchData = async () => {
             try {
                 // Fetch all data concurrently
-                const [statsRes, personalRes, academicRes, acadPctRes, parentRes] = await Promise.all([
+                const [statsRes, personalRes, academicRes, acadPctRes, parentRes, identifiersRes] = await Promise.all([
                     fetch(`${API}/api/dashboard/stats?studtblId=${eid}`, { headers }),
                     fetch(`${API}/api/student/personal?studtblId=${eid}`, { headers }),
                     fetch(`${API}/api/student/academic?studtblId=${eid}`, { headers }),
                     fetch(`${API}/api/student/academic-percentage?studtblId=${eid}`, { headers }),
-                    fetch(`${API}/api/student/parent?studtblId=${eid}`, { headers })
+                    fetch(`${API}/api/student/parent?studtblId=${eid}`, { headers }),
+                    fetch(`${API}/api/profile/identifiers?studtblId=${eid}`, { headers })
                 ]);
 
                 // Parse responses
-                const [statsData, personalData, academicData, acadPctData, parentData] = await Promise.all([
+                const [statsData, personalData, academicData, acadPctData, parentData, identifiersData] = await Promise.all([
                     statsRes.ok ? statsRes.json() : null,
                     personalRes.ok ? personalRes.json() : null,
                     academicRes.ok ? academicRes.json() : null,
                     acadPctRes.ok ? acadPctRes.json() : null,
-                    parentRes.ok ? parentRes.json() : null
+                    parentRes.ok ? parentRes.json() : null,
+                    identifiersRes.ok ? identifiersRes.json() : null
                 ]);
 
                 if (statsData) setStats(statsData);
@@ -204,6 +207,7 @@ export default function Dashboard() {
                 if (academicData) setAcademic(academicData);
                 if (acadPctData) setAcadPct(acadPctData);
                 if (parentData) setParentData(parentData);
+                if (identifiersData) setIdentifiers(identifiersData);
 
             } catch (err) {
                 console.error("Failed to load dashboard data", err);
@@ -474,6 +478,13 @@ export default function Dashboard() {
     const odPct = stats?.od_percentage ?? 0;
     const absentPct = stats?.absent_percentage ?? 0;
 
+    const extractUmisId = () => {
+        if (!identifiers) return null;
+        const key = Object.keys(identifiers).find(k => k.toLowerCase().includes('umis') || k.toLowerCase().includes('omis'));
+        return key ? identifiers[key] : null;
+    };
+    const umisIdValue = extractUmisId();
+
     /* ─────────────────────────────── Render ─────────────────────────────── */
     return (
         <div className="min-h-[100dvh] bg-slate-50 text-slate-800 overflow-x-hidden pb-24 md:pb-28">
@@ -593,6 +604,7 @@ export default function Dashboard() {
                                             <div className="p-1.5 rounded-lg bg-indigo-500/10"><Sparkles size={14} className="text-indigo-400" /></div>
                                             Quick Info
                                         </h4>
+                                        {umisIdValue && <ProfileRow icon={FileText} label="UMIS ID" value={umisIdValue} />}
                                         {stats?.program && <ProfileRow icon={Award} label="Programme" value={stats.program} />}
                                         {academic?.current_academic_year && <ProfileRow icon={Calendar} label="Academic Year" value={academic.current_academic_year} />}
                                         {stats?.mentor_name && <ProfileRow icon={User} label="Mentor" value={stats.mentor_name} />}
@@ -623,16 +635,40 @@ export default function Dashboard() {
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 12 }}
                             transition={{ duration: 0.25, ease: 'easeOut' }}
-                            className="space-y-3 sm:space-y-4"
+                            className="space-y-6 sm:space-y-8"
                         >
+                            {/* Header Section */}
+                            <div className="relative rounded-3xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                                <div className="h-32 sm:h-48 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+                                <div className="px-6 sm:px-10 pb-6 sm:pb-8 relative">
+                                    <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-center sm:items-end -mt-16 sm:-mt-20">
+                                        <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-xl bg-white overflow-hidden flex-shrink-0 z-10">
+                                            <ProfileImage
+                                                studtblId={studtblId}
+                                                documentId={personal?.photo_id}
+                                                fallback={personal?.name?.substring(0, 2) || 'EM'}
+                                            />
+                                        </div>
+                                        <div className="flex-1 text-center sm:text-left pt-2 sm:pt-0 pb-2">
+                                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{personal?.name || 'Student Name'}</h1>
+                                            <p className="text-slate-500 font-medium mt-1 flex items-center justify-center sm:justify-start gap-2">
+                                                <span className="bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full text-sm font-bold border border-indigo-100">
+                                                    {personal?.reg_no || 'Register No'}
+                                                </span>
+                                                <span>•</span>
+                                                <span>Batch {academic?.batch || 'N/A'}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* ── Sub-Navigation Menu ── */}
-                            <motion.div variants={fadeUp} className="bg-white rounded-2xl p-2 border border-slate-200/60 shadow-sm flex overflow-x-auto hide-scrollbar gap-2 mb-4">
+                            <motion.div variants={fadeUp} initial="hidden" animate="visible" className="bg-white rounded-2xl p-2 border border-slate-200/60 shadow-sm flex overflow-x-auto hide-scrollbar gap-2 mb-4 relative z-20">
                                 {[
                                     { id: 'profile', icon: User, label: 'Profile' },
                                     { id: 'campus', icon: CheckCircle2, label: 'Campus Connect' },
-                                    { id: 'achievements', icon: Award, label: 'Achievements' },
-                                    { id: 'course', icon: BookOpen, label: 'Course Details' },
-                                    { id: 'attendance', icon: Calendar, label: 'Attendance Log' }
+                                    { id: 'achievements', icon: Award, label: 'Achievements' }
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
@@ -659,98 +695,7 @@ export default function Dashboard() {
                                         transition={{ duration: 0.2 }}
                                         className="space-y-3 sm:space-y-4"
                                     >
-                                        {/* ── Profile Card ── */}
-                                        {(!personal || !academic) ? null : (
-                                            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                                                <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50">
-                                                    <div className="h-20 sm:h-28 relative overflow-hidden">
-                                                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
-                                                        <div className="absolute inset-0 opacity-30"
-                                                            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
-                                                    </div>
-                                                    <div className="relative -mt-10 sm:-mt-12 flex justify-center">
-                                                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
-                                                            <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
-                                                        </div>
-                                                    </div>
-                                                    <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
-                                                        <div>
-                                                            <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
-                                                            <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
-                                                            {personal?.email && (
-                                                                <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-center gap-1"><Mail size={10} />{personal.email}</p>
-                                                            )}
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <ProfileRow icon={BookOpen} label="Department" value={academic?.dept || '—'} />
-                                                            <div className="grid grid-cols-2 gap-1.5">
-                                                                <ProfileRow icon={GraduationCap} label="Semester" value={academic?.semester_name || `Sem ${academic?.semester || '—'}`} />
-                                                                <ProfileRow icon={Award} label="Batch" value={academic?.batch || '—'} />
-                                                            </div>
-                                                            <div className="grid grid-cols-2 gap-1.5">
-                                                                <ProfileRow icon={User} label="Admission" value={academic?.admission_mode || '—'} />
-                                                                <ProfileRow icon={FileText} label="Univ Reg" value={academic?.university_reg_no || '—'} />
-                                                            </div>
-                                                            {academic?.mentor_name && <ProfileRow icon={Users} label="Mentor" value={academic.mentor_name} />}
-                                                            {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                        {/* ── Academic History + Family ── */}
-                                        {
-                                            (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) ? (
-                                                <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                                                    className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-
-                                                    {acadPct && acadPct.records && acadPct.records.length > 0 && (
-                                                        <motion.div variants={fadeUp}
-                                                            className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
-                                                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                                                <div className="p-1.5 rounded-lg bg-cyan-500/10"><BarChart3 size={14} className="text-cyan-400" /></div>
-                                                                Academic History
-                                                            </h4>
-                                                            <div className="space-y-3">
-                                                                {acadPct.records.map((r, i) => (
-                                                                    <div key={i} className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
-                                                                        <div>
-                                                                            <p className="text-sm font-bold text-slate-700">{r.exam}</p>
-                                                                            <p className="text-[10px] text-slate-500 font-medium">Year of Passing: {r.year}</p>
-                                                                        </div>
-                                                                        <div className="text-right">
-                                                                            <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 tabular-nums">
-                                                                                {parseFloat(r.percentage).toFixed(1)}%
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-
-                                                    {parentData && (parentData.father_name || parentData.mother_name) && (
-                                                        <motion.div variants={fadeUp}
-                                                            className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
-                                                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                                                <div className="p-1.5 rounded-lg bg-pink-500/10"><Users size={14} className="text-pink-400" /></div>
-                                                                Family Details
-                                                            </h4>
-                                                            <div className="space-y-3">
-                                                                {parentData.father_name && <FamilyCard label="Father" name={parentData.father_name} occupation={parentData.father_occupation} mobile={parentData.father_mobile} />}
-                                                                {parentData.mother_name && <FamilyCard label="Mother" name={parentData.mother_name} occupation={parentData.mother_occupation} mobile={parentData.mother_mobile} />}
-                                                                {parentData.guardian_name && <FamilyCard label="Guardian" name={parentData.guardian_name} occupation={parentData.guardian_occupation} mobile={parentData.guardian_mobile} />}
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </motion.div>
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                                                    <BookOpen size={48} className="mb-4 opacity-50" />
-                                                    <p>No additional information available.</p>
-                                                </div>
-                                            )
-                                        }
+                                        <ProfileOverviewTab personal={personal} academic={academic} parent={parentData} />
 
                                         {/* ── Debug Section ── */}
                                         {stats?.raw_data && (
@@ -777,18 +722,6 @@ export default function Dashboard() {
                                 {activeSubTab === 'achievements' && (
                                     <motion.div key="sub-achievements" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                                         <AchievementsTab studtblId={studtblId} />
-                                    </motion.div>
-                                )}
-
-                                {activeSubTab === 'course' && (
-                                    <motion.div key="sub-course" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                                        <CourseDetailsTab studtblId={studtblId} academic={academic} />
-                                    </motion.div>
-                                )}
-
-                                {activeSubTab === 'attendance' && (
-                                    <motion.div key="sub-attendance" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                                        <AttendanceLogTab studtblId={studtblId} academic={academic} />
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -1130,46 +1063,5 @@ function FamilyCard({ label, name, occupation, mobile }: { label: string; name: 
     );
 }
 
-function ProfileImage({ studtblId, documentId, fallback }: { studtblId: string; documentId?: string; fallback: string }) {
-    const [src, setSrc] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (!studtblId || !documentId) return;
-        let revoked = false;
 
-        (async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const institutionId = localStorage.getItem('institutionId') || 'SEC';
-                const res = await fetch(
-                    `${API}/api/profile/image?studtblId=${encodeURIComponent(studtblId)}&documentId=${encodeURIComponent(documentId)}`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            'X-Institution-Id': institutionId
-                        }
-                    },
-                );
-                if (res.ok && !revoked) {
-                    const ct = res.headers.get('content-type') || '';
-                    if (ct.includes('image') || ct.includes('octet-stream') || ct.includes('jpeg')) {
-                        const blob = await res.blob();
-                        if (blob.size > 100) {
-                            setSrc(URL.createObjectURL(blob));
-                        }
-                    }
-                }
-            } catch { /* fallback to initials */ }
-        })();
-
-        return () => { revoked = true; };
-    }, [studtblId, documentId]);
-
-    if (src) return <img src={src} alt="Profile" className="w-full h-full object-cover" />;
-
-    return (
-        <div className="w-full h-full bg-gradient-to-br from-indigo-600 to-cyan-500 flex items-center justify-center">
-            <span className="text-2xl font-black text-white">{fallback}</span>
-        </div>
-    );
-}
