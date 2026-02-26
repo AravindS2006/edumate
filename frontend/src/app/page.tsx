@@ -10,6 +10,8 @@ import Image from 'next/image';
 const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
 const MotionButton = dynamic(() => import('framer-motion').then(m => m.motion.button), { ssr: false });
 
+const API = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+
 export default function Home() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +22,7 @@ export default function Home() {
 
   useEffect(() => {
     // Pre-warm the Render backend while user types credentials
-    fetch('/api/health').catch(() => { });
+    fetch(`${API}/api/health`).catch(() => { });
     // Trigger entrance animation after hydration
     setMounted(true);
   }, []);
@@ -30,7 +32,7 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(`${API}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
