@@ -10,7 +10,7 @@ import CourseDetailsTab from '@/app/dashboard/profile_components/CourseDetailsTa
 import AttendanceLogTab from '@/app/dashboard/profile_components/AttendanceLogTab';
 
 
-const API = process.env.NEXT_PUBLIC_API_URL || '';
+const API = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
 const fadeIn = { hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } };
 

@@ -93,8 +93,8 @@ interface ParentData {
 
 /* ─────────────────────────────── Constants ─────────────────────────── */
 
-// All API calls use relative /api/* paths — Vercel rewrites proxy them to the Render backend
-const API = '';
+// All API calls use absolute paths to directly hit the Render Backend, bypassing Vercel Edge.
+const API = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
 const stagger = {
     hidden: {},
