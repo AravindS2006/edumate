@@ -48,3 +48,6 @@ edumate-log-export-2026-02-18T12-15-22.json
 .env.local
 frontend/.env
 frontend/.env.local
+*.txt
+backend/*.txt
+frontend/*.txt

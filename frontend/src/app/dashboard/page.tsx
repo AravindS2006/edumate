@@ -15,6 +15,12 @@ import { CourseAttendance } from '@/components/CourseAttendance';
 import { BottomNav, type NavTab } from '@/components/BottomNav';
 import Image from 'next/image';
 
+// New Profile Subcomponents
+import CampusConnectTab from './profile_components/CampusConnectTab';
+import AchievementsTab from './profile_components/AchievementsTab';
+import CourseDetailsTab from './profile_components/CourseDetailsTab';
+import AttendanceLogTab from './profile_components/AttendanceLogTab';
+import { ProfileImage } from '@/components/ProfileImage';
 
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -146,6 +152,7 @@ export default function Dashboard() {
 
     // Bottom nav tab
     const [activeTab, setActiveTab] = useState<NavTab>('home');
+    const [activeSubTab, setActiveSubTab] = useState<'profile' | 'campus' | 'achievements' | 'course' | 'attendance'>('profile');
 
     // Greeting
     const [greeting, setGreeting] = useState('Good day');
@@ -618,113 +625,173 @@ export default function Dashboard() {
                             transition={{ duration: 0.25, ease: 'easeOut' }}
                             className="space-y-3 sm:space-y-4"
                         >
-                            {/* ── Profile Card ── */}
-                            {(!personal || !academic) ? null : (
-                                <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                                    <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50">
-                                        <div className="h-20 sm:h-28 relative overflow-hidden">
-                                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
-                                            <div className="absolute inset-0 opacity-30"
-                                                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
-                                        </div>
-                                        <div className="relative -mt-10 sm:-mt-12 flex justify-center">
-                                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
-                                                <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
-                                            </div>
-                                        </div>
-                                        <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
-                                            <div>
-                                                <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
-                                                <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
-                                                {personal?.email && (
-                                                    <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-center gap-1"><Mail size={10} />{personal.email}</p>
-                                                )}
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <ProfileRow icon={BookOpen} label="Department" value={academic?.dept || '—'} />
-                                                <div className="grid grid-cols-2 gap-1.5">
-                                                    <ProfileRow icon={GraduationCap} label="Semester" value={academic?.semester_name || `Sem ${academic?.semester || '—'}`} />
-                                                    <ProfileRow icon={Award} label="Batch" value={academic?.batch || '—'} />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-1.5">
-                                                    <ProfileRow icon={User} label="Admission" value={academic?.admission_mode || '—'} />
-                                                    <ProfileRow icon={FileText} label="Univ Reg" value={academic?.university_reg_no || '—'} />
-                                                </div>
-                                                {academic?.mentor_name && <ProfileRow icon={Users} label="Mentor" value={academic.mentor_name} />}
-                                                {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
-                                            </div>
-                                        </div>
+                            {/* ── Sub-Navigation Menu ── */}
+                            <motion.div variants={fadeUp} className="bg-white rounded-2xl p-2 border border-slate-200/60 shadow-sm flex overflow-x-auto hide-scrollbar gap-2 mb-4">
+                                {[
+                                    { id: 'profile', icon: User, label: 'Profile' },
+                                    { id: 'campus', icon: CheckCircle2, label: 'Campus Connect' },
+                                    { id: 'achievements', icon: Award, label: 'Achievements' },
+                                    { id: 'course', icon: BookOpen, label: 'Course Details' },
+                                    { id: 'attendance', icon: Calendar, label: 'Attendance Log' }
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveSubTab(tab.id as any)}
+                                        className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeSubTab === tab.id
+                                            ? 'bg-indigo-50 text-indigo-600'
+                                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                            }`}
+                                    >
+                                        <tab.icon size={16} />
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </motion.div>
 
-                                    </div>
-                                </motion.div>
-                            )}
-                            {/* ── Academic History + Family ── */}
-                            {
-                                (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) ? (
-                                    <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                                        className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-
-                                        {acadPct && acadPct.records && acadPct.records.length > 0 && (
-                                            <motion.div variants={fadeUp}
-                                                className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
-                                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                                    <div className="p-1.5 rounded-lg bg-cyan-500/10"><BarChart3 size={14} className="text-cyan-400" /></div>
-                                                    Academic History
-                                                </h4>
-                                                <div className="space-y-3">
-                                                    {acadPct.records.map((r, i) => (
-                                                        <div key={i} className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
-                                                            <div>
-                                                                <p className="text-sm font-bold text-slate-700">{r.exam}</p>
-                                                                <p className="text-[10px] text-slate-500 font-medium">Year of Passing: {r.year}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 tabular-nums">
-                                                                    {parseFloat(r.percentage).toFixed(1)}%
-                                                                </p>
-                                                            </div>
+                            {/* ── Dynamic Tab Content ── */}
+                            <AnimatePresence mode="wait">
+                                {activeSubTab === 'profile' && (
+                                    <motion.div
+                                        key="sub-profile"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="space-y-3 sm:space-y-4"
+                                    >
+                                        {/* ── Profile Card ── */}
+                                        {(!personal || !academic) ? null : (
+                                            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                                                <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50">
+                                                    <div className="h-20 sm:h-28 relative overflow-hidden">
+                                                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-500" />
+                                                        <div className="absolute inset-0 opacity-30"
+                                                            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
+                                                    </div>
+                                                    <div className="relative -mt-10 sm:-mt-12 flex justify-center">
+                                                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ring-4 ring-white overflow-hidden bg-slate-900 shadow-2xl shadow-indigo-500/20">
+                                                            <ProfileImage studtblId={studtblId} documentId={personal?.photo_id} fallback={initials} />
                                                         </div>
-                                                    ))}
+                                                    </div>
+                                                    <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-2 sm:pt-3 text-center space-y-2 sm:space-y-3">
+                                                        <div>
+                                                            <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{displayName}</h2>
+                                                            <p className="text-xs text-indigo-400 font-mono font-bold mt-0.5">{personal?.reg_no || '—'}</p>
+                                                            {personal?.email && (
+                                                                <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-center gap-1"><Mail size={10} />{personal.email}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <ProfileRow icon={BookOpen} label="Department" value={academic?.dept || '—'} />
+                                                            <div className="grid grid-cols-2 gap-1.5">
+                                                                <ProfileRow icon={GraduationCap} label="Semester" value={academic?.semester_name || `Sem ${academic?.semester || '—'}`} />
+                                                                <ProfileRow icon={Award} label="Batch" value={academic?.batch || '—'} />
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-1.5">
+                                                                <ProfileRow icon={User} label="Admission" value={academic?.admission_mode || '—'} />
+                                                                <ProfileRow icon={FileText} label="Univ Reg" value={academic?.university_reg_no || '—'} />
+                                                            </div>
+                                                            {academic?.mentor_name && <ProfileRow icon={Users} label="Mentor" value={academic.mentor_name} />}
+                                                            {personal?.bus_route && <ProfileRow icon={Bus} label="Transport" value={personal.bus_route} />}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </motion.div>
                                         )}
+                                        {/* ── Academic History + Family ── */}
+                                        {
+                                            (acadPct?.records?.length || parentData?.father_name || parentData?.mother_name) ? (
+                                                <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                                                    className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
 
-                                        {parentData && (parentData.father_name || parentData.mother_name) && (
-                                            <motion.div variants={fadeUp}
-                                                className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
-                                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                                                    <div className="p-1.5 rounded-lg bg-pink-500/10"><Users size={14} className="text-pink-400" /></div>
-                                                    Family Details
-                                                </h4>
-                                                <div className="space-y-3">
-                                                    {parentData.father_name && <FamilyCard label="Father" name={parentData.father_name} occupation={parentData.father_occupation} mobile={parentData.father_mobile} />}
-                                                    {parentData.mother_name && <FamilyCard label="Mother" name={parentData.mother_name} occupation={parentData.mother_occupation} mobile={parentData.mother_mobile} />}
-                                                    {parentData.guardian_name && <FamilyCard label="Guardian" name={parentData.guardian_name} occupation={parentData.guardian_occupation} mobile={parentData.guardian_mobile} />}
+                                                    {acadPct && acadPct.records && acadPct.records.length > 0 && (
+                                                        <motion.div variants={fadeUp}
+                                                            className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
+                                                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+                                                                <div className="p-1.5 rounded-lg bg-cyan-500/10"><BarChart3 size={14} className="text-cyan-400" /></div>
+                                                                Academic History
+                                                            </h4>
+                                                            <div className="space-y-3">
+                                                                {acadPct.records.map((r, i) => (
+                                                                    <div key={i} className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-slate-700">{r.exam}</p>
+                                                                            <p className="text-[10px] text-slate-500 font-medium">Year of Passing: {r.year}</p>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 tabular-nums">
+                                                                                {parseFloat(r.percentage).toFixed(1)}%
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+
+                                                    {parentData && (parentData.father_name || parentData.mother_name) && (
+                                                        <motion.div variants={fadeUp}
+                                                            className="rounded-2xl p-4 sm:p-5 border border-slate-200/60 bg-white">
+                                                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+                                                                <div className="p-1.5 rounded-lg bg-pink-500/10"><Users size={14} className="text-pink-400" /></div>
+                                                                Family Details
+                                                            </h4>
+                                                            <div className="space-y-3">
+                                                                {parentData.father_name && <FamilyCard label="Father" name={parentData.father_name} occupation={parentData.father_occupation} mobile={parentData.father_mobile} />}
+                                                                {parentData.mother_name && <FamilyCard label="Mother" name={parentData.mother_name} occupation={parentData.mother_occupation} mobile={parentData.mother_mobile} />}
+                                                                {parentData.guardian_name && <FamilyCard label="Guardian" name={parentData.guardian_name} occupation={parentData.guardian_occupation} mobile={parentData.guardian_mobile} />}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </motion.div>
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                                                    <BookOpen size={48} className="mb-4 opacity-50" />
+                                                    <p>No additional information available.</p>
                                                 </div>
+                                            )
+                                        }
+
+                                        {/* ── Debug Section ── */}
+                                        {stats?.raw_data && (
+                                            <motion.div variants={fadeUp} className="mt-4 mb-4 p-4 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
+                                                <details className="group">
+                                                    <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-500 uppercase tracking-widest list-none">
+                                                        <span className="transition group-open:rotate-90">▶</span> Debug: Raw Backend Data
+                                                    </summary>
+                                                    <pre className="mt-4 text-[10px] text-slate-600 font-mono overflow-auto max-h-60 bg-white p-3 rounded-lg border border-slate-200">
+                                                        {JSON.stringify(stats.raw_data, null, 2)}
+                                                    </pre>
+                                                </details>
                                             </motion.div>
                                         )}
                                     </motion.div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                                        <BookOpen size={48} className="mb-4 opacity-50" />
-                                        <p>No additional information available.</p>
-                                    </div>
-                                )
-                            }
+                                )}
 
-                            {/* ── Debug Section ── */}
-                            {stats?.raw_data && (
-                                <motion.div variants={fadeUp} className="mt-4 mb-4 p-4 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
-                                    <details className="group">
-                                        <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-500 uppercase tracking-widest list-none">
-                                            <span className="transition group-open:rotate-90">▶</span> Debug: Raw Backend Data
-                                        </summary>
-                                        <pre className="mt-4 text-[10px] text-slate-600 font-mono overflow-auto max-h-60 bg-white p-3 rounded-lg border border-slate-200">
-                                            {JSON.stringify(stats.raw_data, null, 2)}
-                                        </pre>
-                                    </details>
-                                </motion.div>
-                            )}
+                                {activeSubTab === 'campus' && (
+                                    <motion.div key="sub-campus" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                        <CampusConnectTab studtblId={studtblId} />
+                                    </motion.div>
+                                )}
+
+                                {activeSubTab === 'achievements' && (
+                                    <motion.div key="sub-achievements" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                        <AchievementsTab studtblId={studtblId} />
+                                    </motion.div>
+                                )}
+
+                                {activeSubTab === 'course' && (
+                                    <motion.div key="sub-course" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                        <CourseDetailsTab studtblId={studtblId} academic={academic} />
+                                    </motion.div>
+                                )}
+
+                                {activeSubTab === 'attendance' && (
+                                    <motion.div key="sub-attendance" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                        <AttendanceLogTab studtblId={studtblId} academic={academic} />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
                             <motion.div variants={fadeUp} className="pt-4 flex justify-center">
                                 <div className="flex items-center gap-2 text-slate-400 text-xs">
