@@ -32,12 +32,19 @@ async def health_check():
     return {"status": "ok", "message": "Backend is running"}
 
 # Allow CORS — read allowed origins from FRONTEND_URL env var
-frontend_url = os.environ.get("FRONTEND_URL", "")
-origins = [frontend_url] if frontend_url else ["*"]
+frontend_url = os.environ.get("FRONTEND_URL", "https://edumate-sairam.vercel.app")
+origins = [
+    frontend_url,
+    "https://edumate-sairam.vercel.app",
+    "https://edumate-sairam.vercel.app/",
+    "http://localhost:3000",
+    "http://localhost:3001"
+]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"^https?://(.*\.vercel\.app|localhost|127\.0\.0\.1)(:[0-9]+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
