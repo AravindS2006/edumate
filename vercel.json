@@ -4,15 +4,5 @@
             "src": "frontend/package.json",
             "use": "@vercel/next"
         }
-    ],
-    "routes": [
-        {
-            "src": "/api/(.*)",
-            "dest": "https://edumate-1-7nj8.onrender.com/api/$1"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/frontend/$1"
-        }
     ]
 }

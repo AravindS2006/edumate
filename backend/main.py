@@ -50,6 +50,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_cache_control_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.method == "GET" and response.status_code == 200:
+        path = request.url.path
+        if "/api/dashboard/stats" in path or "/api/student/academic" in path or "/api/student/personal" in path or "/api/student/parent" in path:
+            response.headers["Cache-Control"] = "public, max-age=1800"  # 30 mins
+        elif "/api/profile/image" in path:
+            response.headers["Cache-Control"] = "public, max-age=86400" # 1 day
+        elif "/api/attendance/" in path or "/api/reports/" in path or "/api/student/exam-status" in path:
+            response.headers["Cache-Control"] = "public, max-age=300"  # 5 mins
+    return response
+
 # Institutions Configuration
 INSTITUTIONS = {
     "SEC": {
