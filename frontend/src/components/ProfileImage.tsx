@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+const API_URL = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : 'https://edumate-1-7nj8.onrender.com';
 
 export function ProfileImage({ studtblId, documentId, fallback }: { studtblId: string; documentId?: string; fallback: string }) {
     const [src, setSrc] = useState<string | null>(null);

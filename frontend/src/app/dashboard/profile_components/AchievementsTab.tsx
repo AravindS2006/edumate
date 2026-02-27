@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Award, AlertCircle, Loader2 } from 'lucide-react';
 
-const API = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+const API = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : 'https://edumate-1-7nj8.onrender.com';
 
 const fadeUp = {
     hidden: { opacity: 0, y: 15 },

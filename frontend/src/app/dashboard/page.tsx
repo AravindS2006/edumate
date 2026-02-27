@@ -94,7 +94,7 @@ interface ParentData {
 /* ─────────────────────────────── Constants ─────────────────────────── */
 
 // All API calls use absolute paths to directly hit the Render Backend, bypassing Vercel Edge.
-const API = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+const API = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : 'https://edumate-1-7nj8.onrender.com';
 
 const stagger = {
     hidden: {},
