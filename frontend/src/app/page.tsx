@@ -10,7 +10,7 @@ import Image from 'next/image';
 const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
 const MotionButton = dynamic(() => import('framer-motion').then(m => m.motion.button), { ssr: false });
 
-const API = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+const API = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : 'https://edumate-1-7nj8.onrender.com';
 
 export default function Home() {
   const [username, setUsername] = useState('');
