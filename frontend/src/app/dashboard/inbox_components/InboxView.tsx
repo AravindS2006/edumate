@@ -182,7 +182,7 @@ export default function InboxView({ studtblId, regNo, API, token, institutionId 
         setDownloadingDocId(documentId);
         try {
             const params = new URLSearchParams({
-                studtblId: encodeURIComponent(studtblId),
+                studtblId: studtblId,
                 documentId: String(documentId),
                 documentType: 'MENTORING_DOC'
             });
