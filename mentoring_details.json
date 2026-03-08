@@ -1,0 +1,74 @@
+[
+  {
+    "url": "https://student.sairam.edu.in/studapi/Inbox/GetMessageDetails?CategoryGuid=b9980d4b-11f3-445f-9dea-12fc8298f777&MessageGuid=4e06bdd0-795e-4cfe-98a8-e576915a1c69&Receiver=SEC23EC242",
+    "response": {
+      "success": true,
+      "message": "Message details retrieved successfully.",
+      "data": {
+        "id": 49693,
+        "categoryId": 0,
+        "messageGuid": "4e06bdd0-795e-4cfe-98a8-e576915a1c69",
+        "title": "End Semester",
+        "description": ".Arrear in DISCRETE TIME SIGNAL PROCESSING WITH LABORATORY, VLSI DESIGN and UNIVERSAL HUMAN VALUES -2:UNDERSTANDING HARMONY.He assured he will pass in the next upcoming examination for the failed subjects .Motivated to concentrate in studies.",
+        "sender": "J. Sandhya",
+        "receiver": "SEC23EC242",
+        "suggestion": "END SEM RESULT DISCUSSION.Arrear in DISCRETE TIME SIGNAL PROCESSING WITH LABORATORY, VLSI DESIGN and UNIVERSAL HUMAN VALUES -2:UNDERSTANDING HARMONY.He assured he will pass in the next upcoming examination for the failed subjects .Motivated to concentrate in studies.",
+        "messageDate": "2026-02-17T15:14:51.263",
+        "isRead": true,
+        "link": null,
+        "createdDate": "2026-02-17T15:14:30.1",
+        "modifiedDate": "2026-02-17T15:14:51.263",
+        "isActive": true
+      },
+      "statusCode": 200
+    }
+  },
+  {
+    "url": "https://student.sairam.edu.in/studapi/Inbox/GetMessageDetails?CategoryGuid=b9980d4b-11f3-445f-9dea-12fc8298f777&MessageGuid=f4c38b73-c36d-40cb-a780-ffc56f93aa88&Receiver=SEC23EC242",
+    "response": {
+      "success": true,
+      "message": "Message details retrieved successfully.",
+      "data": {
+        "id": 36791,
+        "categoryId": 0,
+        "messageGuid": "f4c38b73-c36d-40cb-a780-ffc56f93aa88",
+        "title": "Continuous Assessment Test -3",
+        "description": "Submit Assignment for failed subjects .Prepare well for End Sem Examination.",
+        "sender": "J. Sandhya",
+        "receiver": "SEC23EC242",
+        "suggestion": "Result Discussion. .Submit Assignment for failed subjects .Prepare well for End Sem Examination.",
+        "messageDate": "2025-11-27T11:23:39.67",
+        "isRead": true,
+        "link": null,
+        "createdDate": "2025-11-27T11:23:39.67",
+        "modifiedDate": "2025-11-27T11:23:39.67",
+        "isActive": true
+      },
+      "statusCode": 200
+    }
+  },
+  {
+    "url": "https://student.sairam.edu.in/studapi/Inbox/GetMessageDetails?CategoryGuid=b9980d4b-11f3-445f-9dea-12fc8298f777&MessageGuid=42a17d05-49fc-4db1-b994-ef459c68b3bf&Receiver=SEC23EC242",
+    "response": {
+      "success": true,
+      "message": "Message details retrieved successfully.",
+      "data": {
+        "id": 9709,
+        "categoryId": 0,
+        "messageGuid": "42a17d05-49fc-4db1-b994-ef459c68b3bf",
+        "title": "Continuous Assessment Test -2",
+        "description": "Concentrate in studies .Submit Assignment for Failes Subjects .Work Hard ",
+        "sender": "J. Sandhya",
+        "receiver": "SEC23EC242",
+        "suggestion": "Result Discussion .Concentrate in studies .Submit Assignment for Failes Subjects .Work Hard ",
+        "messageDate": "2025-10-16T11:09:23.233",
+        "isRead": true,
+        "link": null,
+        "createdDate": "2025-10-16T11:09:23.233",
+        "modifiedDate": "2025-10-16T11:09:23.233",
+        "isActive": true
+      },
+      "statusCode": 200
+    }
+  }
+]
