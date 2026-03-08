@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Calendar, BookOpen, GraduationCap, BarChart3,
     FileText, LogOut, AlertCircle, Loader2,
-    User, TrendingUp, Award, Users,
-    CheckCircle2, XCircle, Mail, Phone, Bus,
+    User, TrendingUp, Award, Users, Menu, Upload,
+    CheckCircle2, XCircle, Mail, Phone, Bus, Inbox,
     Download, X, ChevronRight, Sparkles, Heart, ExternalLink
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -14,13 +14,18 @@ import { AttendanceCalendar } from '@/components/AttendanceCalendar';
 import { CourseAttendance } from '@/components/CourseAttendance';
 import { BottomNav, type NavTab } from '@/components/BottomNav';
 import Image from 'next/image';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 // New Profile Subcomponents
 import CampusConnectTab from './profile_components/CampusConnectTab';
 import AchievementsTab from './profile_components/AchievementsTab';
+
+// HallTicket Component
+import HallTicketView from './hallticket_components/HallTicketView';
 import ProfileOverviewTab from './profile_components/ProfileOverviewTab';
 import { ProfileImage } from '@/components/ProfileImage';
-
+import DocumentUploadView from './document_components/DocumentUploadView';
+import InboxView from './inbox_components/InboxView';
 
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -58,6 +63,7 @@ interface AcademicData {
     year_of_study_id: number;
     section_id: number;
     academic_year_id: number;
+    program_id?: number;
 }
 
 interface PersonalData {
@@ -151,9 +157,16 @@ export default function Dashboard() {
     const [attendanceLoading, setAttendanceLoading] = useState(false);
     const [attendanceError, setAttendanceError] = useState<string | null>(null);
 
+    // Arrears State
+    const [arrearsData, setArrearsData] = useState<any[]>([]);
+    const [isArrearModalOpen, setIsArrearModalOpen] = useState(false);
+
     // Bottom nav tab
-    const [activeTab, setActiveTab] = useState<NavTab>('home');
+    const [activeTab, setActiveTab] = useState<NavTab | 'hallticket' | 'documents' | 'inbox'>('home');
     const [activeSubTab, setActiveSubTab] = useState<'profile' | 'campus' | 'achievements' | 'course' | 'attendance'>('profile');
+
+    // Menu State
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     // Greeting
     const [greeting, setGreeting] = useState('Good day');
@@ -344,31 +357,31 @@ export default function Dashboard() {
                 branchId: String(academic.branch_id ?? 2),
                 semesterId: String(academic.semester ?? 6),
                 yearOfStudyId: String(academic.year_of_study_id ?? 3),
-                sectionId: String(academic.section_id ?? 1)
+                sectionId: String(academic.section_id ?? 1),
+                programmeId: String(academic.program_id ?? 1), // usually programme_id is 1 or comes from academic if added later
+                semesterType: academic.semester_type || 'Even'
             });
 
             try {
-                const [dailyRes, leaveRes, courseRes, examRes] = await Promise.all([
+                const [dailyRes, leaveRes, courseRes, examRes, arrearsRes] = await Promise.all([
                     fetch(`${API}/api/attendance/daily-detail?${params}`, { headers }),
                     fetch(`${API}/api/attendance/leave-status?${params}`, { headers }),
                     fetch(`${API}/api/attendance/course-detail?${params}`, { headers }),
-                    fetch(`${API}/api/student/exam-status?${params}`, { headers })
+                    fetch(`${API}/api/student/exam-status?${params}`, { headers }),
+                    fetch(`${API}/api/student/arrears?${params}`, { headers })
                 ]);
 
                 const errors: string[] = [];
 
-                // Process Exam Status (Arrears) - Update existing stats
+                // Process Exam Status & Arrears
                 const examJson = await examRes.json().catch(() => ({}));
-                if (examRes.ok && !examJson.error) {
-                    setStats(prev => {
-                        if (!prev) return null;
-                        return {
-                            ...prev,
-                            arrears: examJson.arrears_current || 0,
-                            // Optionally update OD if dashboard was 0 but this has value?
-                            // od_percentage: prev.od_percentage || examJson.od_pct || 0 
-                        };
-                    });
+                const arrearsJson = await arrearsRes.json().catch(() => ({}));
+
+                if (arrearsRes.ok && arrearsJson.success) {
+                    setArrearsData(arrearsJson.data || []);
+                    setStats(prev => prev ? { ...prev, arrears: arrearsJson.count || 0 } : null);
+                } else if (examRes.ok && !examJson.error) {
+                    setStats(prev => prev ? { ...prev, arrears: examJson.arrears_current || 0 } : null);
                 }
 
                 const dailyJson = await dailyRes.json().catch(() => ({}));
@@ -508,14 +521,11 @@ export default function Dashboard() {
                             <p className="text-[9px] text-slate-500 font-semibold uppercase tracking-[0.2em] hidden sm:block">Sairam Student Portal</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <span className="hidden md:block text-[11px] text-slate-500 font-medium">
+                    <div className="flex items-center gap-2 sm:gap-3 relative">
+                        <span className="hidden md:block text-[11px] text-slate-500 font-medium mr-2">
                             {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                         </span>
-                        <button onClick={() => { localStorage.clear(); router.push('/'); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 hover:border-red-200 transition-all active:scale-95">
-                            <LogOut size={14} /> <span className="hidden sm:inline">Sign Out</span>
-                        </button>
+
                     </div>
                 </div>
             </header>
@@ -555,8 +565,10 @@ export default function Dashboard() {
                                     accent="indigo" badge="/ 10.00" />
                                 <StatCard icon={Sparkles} label="PGPA" value={String(stats?.pgpa || stats?.raw_data?.pG_Cgpa || 0)}
                                     accent="amber" badge="Points" />
-                                <StatCard icon={XCircle} label="Absent" value={`${absentPct.toFixed(1)}%`}
-                                    accent="rose" badge={`${(100 - attendPct - odPct).toFixed(1)}% net`} />
+                                <div onClick={() => setIsArrearModalOpen(true)} className="cursor-pointer transition-transform active:scale-95">
+                                    <StatCard icon={AlertCircle} label="Arrears" value={String(stats?.arrears || 0)}
+                                        accent="rose" badge="View Details" />
+                                </div>
                             </motion.div>
 
                             {/* ━━━━━━━━━━ ROW 2: Analytics (Attendance Ring + Quick Info) ━━━━━━━━━━ */}
@@ -845,7 +857,7 @@ export default function Dashboard() {
                                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                                                     {(reportSemesters || []).map((s: any) => (
                                                         <button key={s.id} onClick={() => downloadReport(s.id)}
-                                                            className={`group px-4 py-3.5 rounded-xl text-sm font-bold border transition-all duration-300 flex items-center justify-between ${selectedSemester === s.id
+                                                            className={`group px-4 py-3.5 rounded-xl text-sm font-bold border transition-all duration-300 ${selectedSemester === s.id
                                                                 ? 'bg-gradient-to-r from-indigo-600 to-violet-600 border-indigo-500/50 text-slate-800 shadow-lg shadow-indigo-500/20'
                                                                 : 'bg-slate-50 border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:border-indigo-500/30 hover:-translate-y-0.5'
                                                                 }`}>
@@ -932,11 +944,119 @@ export default function Dashboard() {
                             </div>
                         </motion.div>
                     )}
+
+                    {activeTab === 'hallticket' && (
+                        <motion.div
+                            key="hallticket"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="pt-2 sm:pt-4"
+                        >
+                            <HallTicketView
+                                studtblId={studtblId}
+                                academic={academic}
+                                API={API}
+                                token={localStorage.getItem('token') || ''}
+                                institutionId={localStorage.getItem('institutionId') || 'SEC'}
+                            />
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'documents' && (
+                        <motion.div
+                            key="documents"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="pt-2 sm:pt-4"
+                        >
+                            <DocumentUploadView
+                                studtblId={studtblId}
+                                API={API}
+                                token={localStorage.getItem('token') || ''}
+                                institutionId={localStorage.getItem('institutionId') || 'SEC'}
+                            />
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'inbox' && (
+                        <motion.div
+                            key="inbox"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="pt-2 sm:pt-4"
+                        >
+                            <InboxView
+                                studtblId={studtblId}
+                                regNo={personal?.reg_no || ''}
+                                API={API}
+                                token={localStorage.getItem('token') || ''}
+                                institutionId={localStorage.getItem('institutionId') || 'SEC'}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Arrears Modal */}
+                <AnimatePresence>
+                    {isArrearModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200"
+                            >
+                                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                        <AlertCircle className="text-rose-500" size={20} />
+                                        Arrear Subjects
+                                    </h3>
+                                    <button onClick={() => setIsArrearModalOpen(false)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-full transition-colors">
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                <div className="p-6 max-h-[60vh] overflow-y-auto">
+                                    {arrearsData && arrearsData.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {arrearsData.map((arr: any, i: number) => (
+                                                <div key={i} className="p-4 rounded-xl bg-rose-50/50 border border-rose-100/50">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-600">
+                                                            {arr.course_Code}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm font-bold text-slate-700">{arr.course_Name}</p>
+                                                    <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                                                        <span>Sem {arr.semesterNo} • {arr.credit} Credit</span>
+                                                        <span className="font-medium text-slate-600">Attempt: {arr.attemptType}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto mb-3">
+                                                <CheckCircle2 size={32} />
+                                            </div>
+                                            <h4 className="text-slate-800 font-bold">All Clear!</h4>
+                                            <p className="text-sm text-slate-500 mt-1">No arrears found for the current semester data.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
                 </AnimatePresence>
             </motion.main>
 
             {/* ═══════════════════════ BOTTOM NAV ═══════════════════════ */}
-            <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+            <BottomNav activeTab={activeTab as NavTab} onTabChange={setActiveTab} />
 
             {/* ═══════════════════════ FOOTER (Desktop only) ═══════════════════════ */}
             <footer className="hidden md:block mt-auto border-t border-slate-100/80 bg-white/95">

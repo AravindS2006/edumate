@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request, Response, Query, Background
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from typing import Optional
 import httpx
 import json
 import asyncio
@@ -59,8 +60,9 @@ async def add_cache_control_header(request: Request, call_next):
             response.headers["Cache-Control"] = "public, max-age=1800"  # 30 mins
         elif "/api/profile/image" in path:
             response.headers["Cache-Control"] = "public, max-age=86400" # 1 day
-        elif "/api/attendance/" in path or "/api/reports/" in path or "/api/student/exam-status" in path:
-            response.headers["Cache-Control"] = "public, max-age=300"  # 5 mins
+        elif "/api/attendance/" in path or "/api/reports/" in path or "/api/student/exam-status" in path or "/api/hallticket/" in path:
+            # 5 mins for volatile data
+            response.headers["Cache-Control"] = "public, max-age=300"
     return response
 
 # Institutions Configuration
@@ -469,6 +471,54 @@ async def get_exam_status(request: Request, studtblId: str,
     return {"error": "Failed to fetch exam status"}
 
 # ============================================================
+#  ARREARS DETAILS
+# ============================================================
+@app.get("/api/student/arrears")
+async def get_arrears_details(
+    request: Request, 
+    studtblId: str, 
+    academicYearId: int = 14,
+    branchId: int = 2,
+    yearOfStudyId: int = 3,
+    semesterId: int = 6,
+    sectionId: int = 2,
+    programmeId: int = 1,
+    semesterType: str = "Even"
+):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetHallticketSubjectDetails"
+    
+    upstream_params = {
+        "AcademicYear_Id": academicYearId,
+        "programme_id": programmeId,
+        "Branch_Id": branchId,
+        "year_id": yearOfStudyId,
+        "Semester_Id": semesterId,
+        "Section_Id": sectionId,
+        "studtblId": studtblId,
+        "Sem_Type": semesterType
+    }
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=upstream_params, headers=headers)
+            if resp.status_code == 200:
+                json_data = resp.json()
+                if "data" in json_data and isinstance(json_data["data"], list):
+                    # Filter for arrears
+                    arrear_subjects = [
+                        item for item in json_data["data"]
+                        if item.get("attemptType", "").lower() == "arrear"
+                    ]
+                    return {"success": True, "count": len(arrear_subjects), "data": arrear_subjects}
+                return {"success": True, "count": 0, "data": []}
+    except Exception as e:
+        pass
+        
+    return {"error": "Failed to fetch arrears details"}
+
+# ============================================================
 #  ACADEMIC PERCENTAGE (HSC / SSLC)
 # ============================================================
 @app.get("/api/student/academic-percentage")
@@ -531,6 +581,243 @@ async def get_parent_details(request: Request, studtblId: str):
     
     return {"error": "Failed to fetch parent details"}
 
+# ============================================================
+#  HALLTICKET
+# ============================================================
+
+@app.get("/api/hallticket/history")
+async def get_hallticket_history(request: Request, studtblId: str, searchTerm: str = ""):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetHallTicketHistoryByStudent"
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId, "SearchTerm": searchTerm}, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        pass
+    return {"error": "Failed to fetch hallticket history"}
+
+
+@app.get("/api/hallticket/subject-details")
+async def get_hallticket_subject_details(
+    request: Request, 
+    studtblId: str, 
+    academicYearId: int = 14,
+    branchId: int = 2,
+    yearOfStudyId: int = 3,
+    semesterId: int = 6,
+    sectionId: int = 2,
+    programmeId: int = 1,
+    semesterType: str = "Even"
+):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetHallticketSubjectDetails"
+    
+    params = {
+        "AcademicYear_Id": academicYearId, "programme_id": programmeId, "Branch_Id": branchId,
+        "year_id": yearOfStudyId, "Semester_Id": semesterId, "Section_Id": sectionId,
+        "studtblId": studtblId, "Sem_Type": semesterType
+    }
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch subject details"}
+
+
+@app.get("/api/hallticket/student-mentor-subjects")
+async def get_hallticket_student_mentor_subjects(
+    request: Request, studtblId: str, academicYearId: int = 14, branchId: int = 2, 
+    sectionId: int = 2, publishYearId: int = 0, semesterType: str = "Even"
+):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetStudentAndMentorSubjects"
+    
+    params = {
+        "studtblId": studtblId, "AcademicYear_Id": academicYearId, "Branch_Id": branchId,
+        "Section_Id": sectionId, "publishYearId": publishYearId, "semesterType": semesterType
+    }
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch mentor subjects"}
+
+
+@app.get("/api/hallticket/selected-subject")
+async def get_hallticket_selected_subject(
+    request: Request, studtblId: str, academicYearId: int = 14, branchId: int = 2, 
+    semesterId: int = 6, sectionId: int = 2, semesterType: str = "Even"
+):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetStudentSelectedSubject"
+    
+    params = {
+        "studtblId": studtblId, "AcademicYear_Id": academicYearId, "Branch_Id": branchId,
+        "Semester_Id": semesterId, "Section_Id": sectionId, "semesterType": semesterType
+    }
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch selected subjects"}
+
+
+@app.get("/api/hallticket/notes")
+async def get_hallticket_notes(request: Request, category: str = "hallticket"):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetGlobalStaticNotesByCategory"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"Category": category}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch notes"}
+
+
+@app.get("/api/hallticket/academic-year-sem")
+async def get_hallticket_academic_year_sem(request: Request, programmeId: int = 1):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetAcademicYearAndSemesterType"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"programmeId": programmeId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch academic year and sem"}
+
+
+@app.get("/api/hallticket/download-status")
+async def get_hallticket_download_status(
+    request: Request, studtblId: str, semesterId: int = 6, 
+    semesterType: str = "Odd", academicYearId: int = 14
+):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/HallTicket/GetDownloadHallTicketsByFeesPaid"
+    params = {
+        "studtblId": studtblId, "SemesterId": semesterId, 
+        "semesterType": semesterType, "academicYearId": academicYearId
+    }
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch download status"}
+
+# ============================================================
+#  DOCUMENT UPLOAD
+# ============================================================
+
+@app.get("/api/document/status")
+async def get_document_status(request: Request, studtblId: str):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Document/GetDocumentStatusByStudent"
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch document status"}
+
+@app.get("/api/document/others")
+async def get_other_documents(request: Request, studtblId: str, ocrStatus: str = "others"):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Document/GetOtherDocumentsByStudent"
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId, "ocrStatus": ocrStatus}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch other documents"}
+
+@app.get("/api/document/endorsement-list")
+async def get_endorsement_list(request: Request, studtblId: str):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Endorsement/GetEndorsementList"
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch endorsement list"}
+
+@app.get("/api/document/professional-course-list")
+async def get_professional_course_list(request: Request, endorsementId: int = 1):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Endorsement/GetProfessionalCourseList"
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"endorsementId": endorsementId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch professional course list"}
+
+@app.get("/api/document/endorsement-certificates")
+async def get_endorsement_certificates(request: Request, studtblId: str, endorsementId: int = 1, searchText: str = ""):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Endorsement/GetEndorsementCertificateList"
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId, "endorsementId": endorsementId, "searchText": searchText}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch endorsement certificates"}
+
+@app.get("/api/document/endorsement-courses")
+async def get_endorsement_courses(request: Request, studtblId: str, professionalCourseId: int = 1):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Endorsement/GetEndorsementCourseList"
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId, "professionalCourseId": professionalCourseId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch endorsement courses"}
+
+@app.get("/api/document/download-blob")
+async def download_document_blob(request: Request, studtblId: str, documentId: str):
+    studtblId = fix_id(studtblId)
+    documentId = fix_id(documentId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Document/DownloadBlob"
+    
+    # We'll stream the binary reaction directly to the client
+    from fastapi.responses import StreamingResponse
+    try:
+        async with get_client(request) as client:
+            # We use stream() to efficiently pass through binary data like PDFs or Images
+            response = await client.get(upstream_url, params={"documentId": documentId, "studtblId": studtblId}, headers=headers)
+            
+            def iterfile():
+                yield response.content
+            
+            # Forward the exact content type from the upstream API
+            content_type = response.headers.get("Content-Type", "application/octet-stream")
+            return StreamingResponse(iterfile(), media_type=content_type)
+    except Exception as e: pass
+    return {"error": "Failed to download blob"}
 # ============================================================
 #  REPORT MENU (available report types)
 # ============================================================
@@ -902,7 +1189,85 @@ async def get_course_details(request: Request, studtblId: str, regulationId: str
     except Exception as e:
         return {"error": str(e)}
 
+# ============================================================
+#  INBOX
+# ============================================================
+
+@app.get("/api/inbox/categories")
+async def get_inbox_categories(request: Request, studtblId: str):
+    # studtblId here is actually the reg number (e.g. "SEC23EC242"), NOT encrypted — pass as-is
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Inbox/GetInboxCategory"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"StudtblId": studtblId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch inbox categories"}
+
+@app.get("/api/inbox/messages")
+async def get_inbox_messages(
+    request: Request,
+    categoryGuid: str,
+    receiver: str,
+    pageNumber: int = 1,
+    pageSize: int = 10,
+    searchText: str = "",
+    isArchived: bool = False,
+    isRead: Optional[bool] = None
+):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Inbox/GetMessagesByCategory"
+    params: dict = {
+        "CategoryGuid": categoryGuid,
+        "Receiver": receiver,
+        "pageNumber": pageNumber,
+        "pageSize": pageSize,
+        "SearchText": searchText,
+        "IsArchived": str(isArchived).lower()
+    }
+    if isRead is not None:
+        params["IsRead"] = str(isRead).lower()
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch messages"}
+
+@app.get("/api/inbox/message-details")
+async def get_message_details(request: Request, categoryGuid: str, messageGuid: str, receiver: str):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Inbox/GetMessageDetails"
+    params = {"CategoryGuid": categoryGuid, "MessageGuid": messageGuid, "Receiver": receiver}
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception as e: pass
+    return {"error": "Failed to fetch message details"}
+
+@app.get("/api/inbox/download-doc")
+async def download_inbox_doc(request: Request, studtblId: str, documentId: str, documentType: str = "MENTORING_DOC"):
+    studtblId = fix_id(studtblId)
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Document/DownloadBlob"
+    params = {"documentId": documentId, "studtblId": studtblId, "documentType": documentType}
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            content_type = resp.headers.get("content-type", "application/octet-stream")
+            return StreamingResponse(
+                content=iter([resp.content]),
+                status_code=resp.status_code,
+                media_type=content_type,
+                headers={"Content-Disposition": f"attachment; filename=document_{documentId}"}
+            )
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
