@@ -1,35 +1,34 @@
 # 🎓 Edumate: Next-Gen Student Portal
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
-[![Stack: Next.js 15](https://img.shields.io/badge/Frontend-Next.js%2015-black?logo=next.js)](https://nextjs.org/)
+[![Stack: Next.js 16](https://img.shields.io/badge/Frontend-Next.js%2016-black?logo=next.js)](https://nextjs.org/)
 [![Stack: FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Deployment: Vercel](https://img.shields.io/badge/Deployment-Vercel-black?logo=vercel)](https://vercel.com/)
 
-> **Experience the future of student management.** Edumate is a premium, high-performance dashboard that provides a sleek, glassmorphic interface on top of the Sairam Student Portal.
+> **Experience the future of student management.** Edumate is a premium, high-performance dashboard that reconstructs the legacy Sairam Student Portal into a modern, lightning-fast, glassmorphic productivity hub.
 
 ---
 
-## 🎨 Premium UI/UX Experience
+## ✨ Features
 
-Edumate isn't just a portal; it's a productivity hub designed with a mobile-first, bento-grid philosophy.
+Edumate acts as a secure proxy layer over the existing ERP, completely transforming the user experience:
 
-- **💎 Glassmorphism 2.0**: A stunning, translucent interface with vibrant neon accents.
-- **⚡ Performance First**: Staggered animations and non-blocking data fetching.
-- **📅 Smart Attendance**: Interactive calendar view for tracking daily status and leave records.
-- **📊 Academic Insights**: Visualized marks, GPA tracking, and automated report downloads.
+- **💎 Premium UI/UX:** A stunning, translucent interface built with deep glassmorphism, Framer Motion animations, and Tailwind CSS v4.
+- **📅 Smart Attendance & Timetable:** Real-time schedule tracking, daily attendance status, and interactive calendar views.
+- **📊 Academic & Finance Hub:** Instantly check semester marks, track GPA, and view detailed fee breakdowns and receipts.
+- **📥 Inbox & Mentoring:** A fully integrated 3-panel inbox system to read messages, download mentoring documents, and respond to faculty feedback.
+- **📄 Document Upload:** Centralized hub for securely uploading and tracking student endorsements and professional certificates.
+- **🎫 Hall Ticket Generation:** One-click PDF generation and download for current semester exam hall tickets.
+- **⚡ Performance First:** Lightning-fast static frontend (exported) paired with a high-performance HTTPX connection-pooling backend.
 
 ---
 
 ## 🛠️ Technical Architecture
 
-Edumate acts as a secure, high-speed proxy layer, augmenting the existing ERP with modern features and security.
-
 ```mermaid
 graph TD
-    A[User Browser] -- Next.js 15 / Framer Motion --> B(Premium Frontend)
-    B -- Secure API Calls --> C{FastAPI Proxy}
-    C -- AES-256 Handshake --> D[Sairam ERP Server]
-    C -- SSRS Integration --> E[Report Engine]
+    A[User Browser] -- React / Next.js --> B(Edumate Static Frontend)
+    B -- Secure API Calls --> C{Edumate FastAPI Backend}
+    C -- AES-256 Handshake --> D[Original ERP Servers]
     D -- Encrypted Data --> C
     C -- Normalized JSON --> B
 ```
@@ -37,56 +36,65 @@ graph TD
 ### Core Tech Stack
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend** | React 19, Next.js 15 (App Router), Tailwind CSS v4, Framer Motion |
-| **Backend** | Python 3.12, FastAPI, HTTPX, PyCryptodome |
-| **Security** | AES-256-ECB Encryption, SHA-256 Key Derivation, Secure Proxies |
-| **Deployment** | Vercel Serverless (Python + Node.js Monorepo) |
+| **Frontend** | React 19, Next.js 16 (Turbopack, Static Export), Tailwind CSS v4, Framer Motion, Recharts, Lucide React |
+| **Backend** | Python 3.12, FastAPI, Uvicorn, HTTPX (Async), PyCryptodome (AES-256-ECB) |
+| **Deployment** | Vercel (Frontend Hosting) + Render (Backend Web Service) |
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting Started Locally
 
 ### Prerequisites
 - Node.js 18+
-- Python 3.11+
+- Python 3.12+
 - A valid Sairam Student Portal account
 
 ### 1. Clone & Setup
 ```bash
-git clone https://github.com/aravi/edumate.git
+git clone https://github.com/YourUsername/edumate.git
 cd edumate
 ```
 
-### 2. Backend Initialization
+### 2. Run the Backend
+The backend handles the AES encryption handshake and proxies all requests to the legacy ERP.
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
+The backend will run on `http://localhost:8000`.
 
-### 3. Frontend Initialization
+### 3. Run the Frontend
 ```bash
 cd ../frontend
 npm install
 npm run dev
 ```
-
 The application will be available at `http://localhost:3000`.
 
 ---
 
-## 📦 Deployment
+## 📦 Production Deployment
 
-Edumate is optimized for **Vercel** out of the box.
+Edumate is optimized for a split-stack deployment to bypass serverless function limits and ensure zero-cost scaling.
 
-- The `vercel.json` file handles routing between the Next.js frontend and the FastAPI serverless functions in the `api/` directory.
-- Simply link your GitHub repository to Vercel and it will auto-deploy the entire monorepo.
+### Frontend (Vercel)
+1. In `frontend/next.config.ts`, ensure `output: 'export'` is set.
+2. Link the repository to Vercel. Set the Root Directory to `frontend`.
+3. Vercel will build and serve the app completely statically on their CDN.
+
+### Backend (Render)
+1. Create a new Web Service on Render linked to this repository.
+2. Set the Root Directory to `backend`.
+3. Build Command: `pip install -r requirements.txt`
+4. Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+5. Add the Environment Variable: `FRONTEND_URL=https://your-vercel-domain.vercel.app`
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Contributions are what make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -103,5 +111,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ---
 
 <p align="center">
-  Built with ❤️ for the Sairam Community
+  Built with ❤️ for a better student experience.
 </p>

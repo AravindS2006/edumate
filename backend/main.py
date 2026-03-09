@@ -715,6 +715,38 @@ async def get_hallticket_download_status(
     except Exception as e: pass
     return {"error": "Failed to fetch download status"}
 
+class HallTicketDownloadRequest(BaseModel):
+    reportName: str
+    studtblId: str
+    semesterId: int
+    hallticketId: Optional[int] = None
+
+@app.post("/api/hallticket/download-pdf")
+async def download_hallticket_pdf(request: Request, payload: HallTicketDownloadRequest):
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Report/ReportsByName"
+    
+    # We must use the exact payload the user specified, ensuring the encrypted ID is intact
+    upstream_payload = {
+        "reportName": payload.reportName,
+        "studtblId": payload.studtblId,
+        "semesterId": payload.semesterId,
+        "hallticketId": payload.hallticketId
+    }
+    
+    try:
+        async with get_client(request) as client:
+            resp = await client.post(upstream_url, json=upstream_payload, headers=headers)
+            content_type = resp.headers.get("content-type", "application/pdf")
+            return StreamingResponse(
+                content=iter([resp.content]),
+                status_code=resp.status_code,
+                media_type=content_type,
+                headers={"Content-Disposition": "attachment; filename=HallTicket.pdf"}
+            )
+    except Exception as e:
+        return {"error": str(e)}
+
 # ============================================================
 #  DOCUMENT UPLOAD
 # ============================================================

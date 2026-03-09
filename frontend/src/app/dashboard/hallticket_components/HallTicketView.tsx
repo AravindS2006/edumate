@@ -19,6 +19,9 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
     const [selectedSemesterType, setSelectedSemesterType] = useState<string>(academic?.semester_type || '');
     const [academicOptions, setAcademicOptions] = useState<any[]>([]);
 
+    // New states for download
+    const [isDownloading, setIsDownloading] = useState(false);
+
     const [data, setData] = useState<{
         history: any;
         subjects: any;
@@ -103,6 +106,42 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
         };
         fetchAll();
     }, [studtblId, academic, selectedAcademicYearId, selectedSemesterType, API, token, institutionId]);
+
+    const handleDownload = async () => {
+        if (!selectedAcademicYearId || !academic?.semester_id) return;
+        setIsDownloading(true);
+        try {
+            const headers = { Authorization: `Bearer ${token}`, 'X-Institution-Id': institutionId, 'Content-Type': 'application/json' };
+            const payload = {
+                reportName: "StudentHallTicket",
+                studtblId: studtblId, // Raw encrypted string
+                semesterId: academic.semester_id,
+                hallticketId: null
+            };
+            const response = await fetch(`${API}/api/hallticket/download-pdf`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "HallTicket.pdf";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } else {
+                console.error("Download failed:", await response.text());
+            }
+        } catch (error) {
+            console.error("Error downloading hallticket:", error);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     // Derived states
     const subjectsList = data.subjects?.data || [];
@@ -190,8 +229,13 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
                     </div>
                 </div>
                 {isEligible && (
-                    <button onClick={() => window.print()} className="ml-auto flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-sm sm:text-base">
-                        <Download size={16} /> Download
+                    <button
+                        onClick={handleDownload}
+                        disabled={isDownloading}
+                        className="ml-auto flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-sm sm:text-base"
+                    >
+                        {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        {isDownloading ? 'Downloading...' : 'Download'}
                     </button>
                 )}
             </div>
