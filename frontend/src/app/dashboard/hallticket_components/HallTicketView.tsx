@@ -27,8 +27,9 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
         notes: any;
         downloadStatus: any;
         attendanceObj: any; // We'll grab this from page load if possible, or just mock it since this view lacks the full state 
+        stats: any;
     }>({
-        history: null, subjects: null, mentorSubjects: null, selectedSubject: null, notes: null, downloadStatus: null, attendanceObj: null
+        history: null, subjects: null, mentorSubjects: null, selectedSubject: null, notes: null, downloadStatus: null, attendanceObj: null, stats: null
     });
 
     // 1. Fetch Academic Options Once
@@ -76,12 +77,13 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
             });
 
             try {
-                const [histRes, subRes, dlRes, notesRes, attRes] = await Promise.all([
+                const [histRes, subRes, dlRes, notesRes, attRes, statsRes] = await Promise.all([
                     fetch(`${API}/api/hallticket/history?studtblId=${encodeURIComponent(studtblId)}`, { headers }),
                     fetch(`${API}/api/hallticket/subject-details?${params}`, { headers }),
                     fetch(`${API}/api/hallticket/download-status?${params}`, { headers }),
                     fetch(`${API}/api/hallticket/notes`, { headers }),
-                    fetch(`${API}/api/attendance/course-detail?${params}`, { headers })
+                    fetch(`${API}/api/attendance/course-detail?${params}`, { headers }),
+                    fetch(`${API}/api/dashboard/stats?studtblId=${encodeURIComponent(studtblId)}`, { headers })
                 ]);
 
                 const historyJson = await histRes.json().catch(() => null);
@@ -89,6 +91,7 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
                 const dlStatusJson = await dlRes.json().catch(() => null);
                 const notesJson = await notesRes.json().catch(() => null);
                 const attJson = await attRes.json().catch(() => null);
+                const statsJson = await statsRes.json().catch(() => null);
 
                 setData(prev => ({
                     ...prev,
@@ -96,7 +99,8 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
                     subjects: subjectsJson,
                     downloadStatus: dlStatusJson,
                     notes: notesJson,
-                    attendanceObj: attJson
+                    attendanceObj: attJson,
+                    stats: statsJson
                 }));
             } catch (e) { console.error(e); }
             setLoading(false);
@@ -109,13 +113,18 @@ export default function HallTicketView({ studtblId, academic, API, token, instit
     const historyList = data.history?.data || [];
     const isEligible = data.downloadStatus?.success === true;
 
-    // Attendance math (mocked slightly if not present, but using valid attendance data if fetched)
+    // Attendance percentage: use pre-calculated value from dashboard stats (same source as home section)
+    // Fall back to computing from course hours if stats are unavailable
+    const attendPctFromStats = data.stats?.attendance_percentage;
     const attendPctRaw = data.attendanceObj?.data?.reduce((acc: any, curr: any) => {
         acc.p += curr.present_hrs || 0;
         acc.t += curr.total_hrs || 0;
         return acc;
     }, { p: 0, t: 0 }) || { p: 0, t: 0 };
-    const attendPct = attendPctRaw.t > 0 ? ((attendPctRaw.p / attendPctRaw.t) * 100).toFixed(2) : '75.77';
+    const attendPctFromCourses = attendPctRaw.t > 0 ? ((attendPctRaw.p / attendPctRaw.t) * 100).toFixed(2) : null;
+    const attendPct = attendPctFromStats != null
+        ? Number(attendPctFromStats).toFixed(2)
+        : (attendPctFromCourses ?? '0.00');
 
     // Parse History grouped by Semester
     const groupedHistory = useMemo(() => {
