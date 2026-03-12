@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Lock, ArrowRight, Loader2, Mail } from 'lucide-react';
 import Image from 'next/image';
+import { ServerAlertBanner } from '@/components/ServerAlertBanner';
 
 // Lazy-load framer-motion — not needed for initial paint
 const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
@@ -74,6 +75,9 @@ export default function Home() {
 
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <ServerAlertBanner />
+      </div>
       {/* Subtle background decorations */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-20%] left-[-15%] w-[50%] h-[50%] bg-indigo-100/60 rounded-full blur-[120px]"></div>
