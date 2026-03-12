@@ -1,22 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
-const STORAGE_KEY = 'serverAlertDismissed';
-
 export function ServerAlertBanner() {
-  const [dismissed, setDismissed] = useState(true); // start hidden to avoid flash
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) setDismissed(false);
-  }, []);
-
-  const handleDismiss = () => {
-    localStorage.setItem(STORAGE_KEY, '1');
-    setDismissed(true);
-  };
+  const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
 
@@ -28,7 +16,7 @@ export function ServerAlertBanner() {
         experiencing downtime. Some features may be unavailable or show errors. Please try again later.
       </p>
       <button
-        onClick={handleDismiss}
+        onClick={() => setDismissed(true)}
         aria-label="Dismiss alert"
         className="text-amber-500 hover:text-amber-700 transition-colors flex-shrink-0"
       >
