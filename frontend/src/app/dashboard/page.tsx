@@ -26,7 +26,6 @@ import ProfileOverviewTab from './profile_components/ProfileOverviewTab';
 import { ProfileImage } from '@/components/ProfileImage';
 import DocumentUploadView from './document_components/DocumentUploadView';
 import InboxView from './inbox_components/InboxView';
-import { ServerAlertBanner } from '@/components/ServerAlertBanner';
 
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -509,9 +508,6 @@ export default function Dashboard() {
                 <div className="absolute top-[20%] -right-[15%] w-[50%] h-[50%] bg-cyan-100/40 blur-[160px] rounded-full" />
                 <div className="absolute bottom-[-20%] left-[30%] w-[40%] h-[40%] bg-violet-100/30 blur-[140px] rounded-full" />
             </div>
-
-            {/* ── Server Alert Banner ── */}
-            <ServerAlertBanner />
 
             {/* ═══════════════════════ HEADER ═══════════════════════ */}
             <header className="sticky top-0 z-40 border-b border-slate-200/60 backdrop-blur-2xl bg-white/90">
