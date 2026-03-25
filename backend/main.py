@@ -12,7 +12,10 @@ from crypto_utils import encrypt_data, decrypt_data
 from sheets_logger import sheets_logger
 
 # SECRET KEY for accessing logs
-LOGS_SECRET_KEY = "edumate_admin_secret"
+LOGS_SECRET_KEY = os.environ.get("LOGS_SECRET_KEY", "edumate_admin_secret")
+
+# Determine if we are running in production
+IS_PRODUCTION = os.environ.get("ENVIRONMENT", "development").lower() == "production"
 
 
 @asynccontextmanager
@@ -26,7 +29,12 @@ async def lifespan(app: FastAPI):
 async def get_client(request: Request):
     yield request.app.state.client
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+)
 
 @app.get("/api/health")
 async def health_check():
@@ -108,7 +116,10 @@ def get_institution_config(request: Request):
 
 @app.get("/")
 async def root():
-    return {"message": "Edumate Backend Proxy is Running", "docs": "/docs"}
+    response = {"message": "Edumate Backend Proxy is Running"}
+    if not IS_PRODUCTION:
+        response["docs"] = "/docs"
+    return response
 
 class LoginRequest(BaseModel):
     username: str
