@@ -9,6 +9,8 @@ services:
     rootDir: backend
     plan: free
     envVars:
+      - key: ENVIRONMENT
+        value: production
       - key: GOOGLE_CREDENTIALS
         sync: false
       - key: GOOGLE_SHEET_ID

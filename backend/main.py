@@ -26,7 +26,16 @@ async def lifespan(app: FastAPI):
 async def get_client(request: Request):
     yield request.app.state.client
 
-app = FastAPI(lifespan=lifespan)
+# Disable API docs in production
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+is_production = ENVIRONMENT.lower() == "production"
+
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json"
+)
 
 @app.get("/api/health")
 async def health_check():
@@ -108,7 +117,10 @@ def get_institution_config(request: Request):
 
 @app.get("/")
 async def root():
-    return {"message": "Edumate Backend Proxy is Running", "docs": "/docs"}
+    response = {"message": "Edumate Backend Proxy is Running"}
+    if not is_production:
+        response["docs"] = "/docs"
+    return response
 
 class LoginRequest(BaseModel):
     username: str
@@ -294,8 +306,7 @@ async def get_dashboard_stats(request: Request, studtblId: str):
                         "mentor_name": raw.get("mentorName", ""),
                         "total_semesters": raw.get("totalSemesters", 0),
                         "total_years": raw.get("totalYears", 0),
-                        "pgpa": raw.get("pG_Cgpa", 0.0), # Updated key per user feedback
-                        "raw_data": raw # Expose raw data for debugging
+                        "pgpa": raw.get("pG_Cgpa", 0.0) # Updated key per user feedback
                     }
                 return stats
             else:
@@ -339,8 +350,7 @@ async def get_academic_details(request: Request, studtblId: str):
                         "branch_id": raw.get("branchId"),
                         "year_of_study_id": raw.get("yearOfStudyId"),
                         "section_id": raw.get("sectionId"),
-                        "academic_year_id": raw.get("academicYearId"),
-                        "raw_data": raw
+                        "academic_year_id": raw.get("academicYearId")
                     }
     except Exception as e:
         pass
@@ -447,10 +457,9 @@ async def get_exam_status(request: Request, studtblId: str,
                             if raw.get("historyOfArrears") is None: raw["historyOfArrears"] = raw_prev.get("historyOfArrears")
                             if raw.get("totalArrears") is None: raw["totalArrears"] = raw_prev.get("totalArrears")
                             if raw.get("noOfArrears") is None: raw["noOfArrears"] = raw_prev.get("noOfArrears")
-                            raw["_debug_from_sem"] = semesterId - 1
 
                 # Debug: Print all keys to find arrears info
-                
+
                 return {
                     "attendance_eligible": raw.get("isAttendanceEligible", False),
                     "fees_eligible": raw.get("isFeesEligible", False),
@@ -461,9 +470,8 @@ async def get_exam_status(request: Request, studtblId: str,
                     "attendance_pct": raw.get("attendancePercentage", 0),
                     "od_pct": raw.get("odPercentage", 0),
                     # Potential new fields
-                    "arrears_current": raw.get("noOfArrears", 0), 
-                    "arrears_history": raw.get("historyOfArrears", 0),
-                    "raw_data": raw
+                    "arrears_current": raw.get("noOfArrears", 0),
+                    "arrears_history": raw.get("historyOfArrears", 0)
                 }
     except Exception as e:
         pass
@@ -1111,7 +1119,7 @@ async def get_attendance_overall_detail(request: Request, studtblId: str):
             if resp.status_code == 200:
                 json_data = resp.json()
                 data = _extract_attendance_data(json_data)
-                return {"success": True, "data": data, "raw_data": json_data}
+                return {"success": True, "data": data}
     except Exception as e:
         pass
     return {"error": "Failed to fetch overall attendance"}
