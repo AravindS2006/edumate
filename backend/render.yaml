@@ -17,3 +17,5 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: LOGS_SECRET_KEY
+        sync: false
