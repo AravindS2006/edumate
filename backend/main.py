@@ -11,8 +11,13 @@ import os
 from crypto_utils import encrypt_data, decrypt_data
 from sheets_logger import sheets_logger
 
-# SECRET KEY for accessing logs
-LOGS_SECRET_KEY = "edumate_admin_secret"
+# SECRET KEY for accessing logs — must be set via environment variable in production
+LOGS_SECRET_KEY = os.environ.get("LOGS_SECRET_KEY")
+if not LOGS_SECRET_KEY:
+    ENVIRONMENT_CHECK = os.environ.get("ENVIRONMENT", "development")
+    if ENVIRONMENT_CHECK.lower() == "production":
+        raise RuntimeError("LOGS_SECRET_KEY environment variable must be set in production")
+    LOGS_SECRET_KEY = "edumate_admin_secret"  # fallback for local development only
 
 
 @asynccontextmanager
