@@ -8,3 +8,4 @@ requests
 gspread
 oauth2client
 gunicorn
+PyJWT>=2.12.0
