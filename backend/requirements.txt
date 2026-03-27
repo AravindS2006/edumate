@@ -8,3 +8,5 @@ requests
 gspread
 oauth2client
 gunicorn
+PyJWT
+slowapi
