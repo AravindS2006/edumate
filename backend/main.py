@@ -10,6 +10,13 @@ from contextlib import asynccontextmanager
 import os
 from crypto_utils import encrypt_data, decrypt_data
 from sheets_logger import sheets_logger
+from security import (
+    validate_request_authorization,
+    enforce_rate_limit,
+    sanitize_input,
+    audit_logger,
+    validate_studtbl_id_format
+)
 
 # SECRET KEY for accessing logs — must be set via environment variable in production
 LOGS_SECRET_KEY = os.environ.get("LOGS_SECRET_KEY")
@@ -61,8 +68,9 @@ app.add_middleware(
     allow_origins=origins,
     allow_origin_regex=r"^https?://(.*\.vercel\.app|localhost|127\.0\.0\.1)(:[0-9]+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Only allow necessary methods
+    allow_headers=["Authorization", "Content-Type", "X-Institution-Id"],  # Only allow necessary headers
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 @app.middleware("http")
@@ -77,6 +85,35 @@ async def add_cache_control_header(request: Request, call_next):
         elif "/api/attendance/" in path or "/api/reports/" in path or "/api/student/exam-status" in path or "/api/hallticket/" in path:
             # 5 mins for volatile data
             response.headers["Cache-Control"] = "public, max-age=300"
+    return response
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    """
+    Global security middleware to enforce rate limiting and log requests.
+    """
+    # Skip security checks for health and root endpoints
+    if request.url.path in ["/", "/api/health", "/docs", "/redoc", "/openapi.json"]:
+        return await call_next(request)
+
+    # Apply rate limiting (except for login endpoint which has its own limits)
+    if request.url.path != "/api/login":
+        try:
+            await enforce_rate_limit(request)
+        except HTTPException as e:
+            return Response(
+                content=json.dumps({"error": e.detail}),
+                status_code=e.status_code,
+                media_type="application/json"
+            )
+
+    # Add security headers to response
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
     return response
 
 # Institutions Configuration
@@ -219,8 +256,27 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
 # Removed get_upstream_headers as it is replaced by get_institution_config
 
 def fix_id(studtblId: str) -> str:
-    """Ensure + and = are not corrupted by URL encoding."""
-    return studtblId.replace(" ", "+")
+    """
+    Ensure + and = are not corrupted by URL encoding.
+    Also sanitize input to prevent injection attacks.
+    """
+    if not studtblId:
+        return ""
+
+    # Sanitize input first
+    studtblId = sanitize_input(studtblId, max_length=200)
+
+    # Fix URL encoding
+    studtblId = studtblId.replace(" ", "+")
+
+    # Validate format
+    if not validate_studtbl_id_format(studtblId):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid studtblId format"
+        )
+
+    return studtblId
 
 
 def build_attendance_params(request: Request) -> dict:
@@ -242,7 +298,10 @@ def build_attendance_params(request: Request) -> dict:
 async def get_profile_image(request: Request, studtblId: str, documentId: str = "tdN4BQKuPTzj9130EWB8Gw=="):
     studtblId = fix_id(studtblId)
     documentId = fix_id(documentId)
-    
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/profile/image")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Document/DownloadBlob"
     
@@ -274,6 +333,10 @@ async def get_profile_image(request: Request, studtblId: str, documentId: str = 
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/dashboard/stats")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Dashboard/GetStudentDashboardDetails"
     
@@ -327,6 +390,10 @@ async def get_dashboard_stats(request: Request, studtblId: str):
 @app.get("/api/student/academic")
 async def get_academic_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/student/academic")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentAcademicDetails"
     
@@ -371,6 +438,10 @@ async def get_academic_details(request: Request, studtblId: str):
 @app.get("/api/student/personal")
 async def get_personal_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/student/personal")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentPersonalDetails"
     try:
@@ -405,7 +476,7 @@ async def get_personal_details(request: Request, studtblId: str):
                 pass
     except Exception as e:
         pass
-        
+
     return {"error": "Failed to fetch personal details"}
 
 # ============================================================
@@ -415,11 +486,15 @@ async def get_personal_details(request: Request, studtblId: str):
 #  EXAM STATUS (for arrears / eligibility)
 # ============================================================
 @app.get("/api/student/exam-status")
-async def get_exam_status(request: Request, studtblId: str, 
+async def get_exam_status(request: Request, studtblId: str,
                           academicYearId: int = 14, yearOfStudyId: int = 3,
                           semesterId: int = 6, branchId: int = 2,
                           sectionId: int = 2, semesterType: str = "Even"):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/student/exam-status")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/HallTicket/GetStudentExamStatus"
     params = {
@@ -488,8 +563,8 @@ async def get_exam_status(request: Request, studtblId: str,
 # ============================================================
 @app.get("/api/student/arrears")
 async def get_arrears_details(
-    request: Request, 
-    studtblId: str, 
+    request: Request,
+    studtblId: str,
     academicYearId: int = 14,
     branchId: int = 2,
     yearOfStudyId: int = 3,
@@ -499,6 +574,10 @@ async def get_arrears_details(
     semesterType: str = "Even"
 ):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/student/arrears")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/HallTicket/GetHallticketSubjectDetails"
     
@@ -537,6 +616,10 @@ async def get_arrears_details(
 @app.get("/api/student/academic-percentage")
 async def get_academic_percentage(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/student/academic-percentage")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentAcademicPercentage"
     
@@ -568,6 +651,10 @@ async def get_academic_percentage(request: Request, studtblId: str):
 @app.get("/api/student/parent")
 async def get_parent_details(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/student/parent")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentParentDetails"
     
@@ -601,6 +688,10 @@ async def get_parent_details(request: Request, studtblId: str):
 @app.get("/api/hallticket/history")
 async def get_hallticket_history(request: Request, studtblId: str, searchTerm: str = ""):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/hallticket/history")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/HallTicket/GetHallTicketHistoryByStudent"
     
@@ -616,8 +707,8 @@ async def get_hallticket_history(request: Request, studtblId: str, searchTerm: s
 
 @app.get("/api/hallticket/subject-details")
 async def get_hallticket_subject_details(
-    request: Request, 
-    studtblId: str, 
+    request: Request,
+    studtblId: str,
     academicYearId: int = 14,
     branchId: int = 2,
     yearOfStudyId: int = 3,
@@ -627,6 +718,10 @@ async def get_hallticket_subject_details(
     semesterType: str = "Even"
 ):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/hallticket/subject-details")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/HallTicket/GetHallticketSubjectDetails"
     
@@ -645,10 +740,14 @@ async def get_hallticket_subject_details(
 
 @app.get("/api/hallticket/student-mentor-subjects")
 async def get_hallticket_student_mentor_subjects(
-    request: Request, studtblId: str, academicYearId: int = 14, branchId: int = 2, 
+    request: Request, studtblId: str, academicYearId: int = 14, branchId: int = 2,
     sectionId: int = 2, publishYearId: int = 0, semesterType: str = "Even"
 ):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/hallticket/student-mentor-subjects")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/HallTicket/GetStudentAndMentorSubjects"
     
@@ -666,10 +765,14 @@ async def get_hallticket_student_mentor_subjects(
 
 @app.get("/api/hallticket/selected-subject")
 async def get_hallticket_selected_subject(
-    request: Request, studtblId: str, academicYearId: int = 14, branchId: int = 2, 
+    request: Request, studtblId: str, academicYearId: int = 14, branchId: int = 2,
     semesterId: int = 6, sectionId: int = 2, semesterType: str = "Even"
 ):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/hallticket/selected-subject")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/HallTicket/GetStudentSelectedSubject"
     
@@ -711,10 +814,14 @@ async def get_hallticket_academic_year_sem(request: Request, programmeId: int = 
 
 @app.get("/api/hallticket/download-status")
 async def get_hallticket_download_status(
-    request: Request, studtblId: str, semesterId: int = 6, 
+    request: Request, studtblId: str, semesterId: int = 6,
     semesterType: str = "Odd", academicYearId: int = 14
 ):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/hallticket/download-status")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/HallTicket/GetDownloadHallTicketsByFeesPaid"
     params = {
@@ -767,6 +874,10 @@ async def download_hallticket_pdf(request: Request, payload: HallTicketDownloadR
 @app.get("/api/document/status")
 async def get_document_status(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/document/status")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Document/GetDocumentStatusByStudent"
     
@@ -780,6 +891,10 @@ async def get_document_status(request: Request, studtblId: str):
 @app.get("/api/document/others")
 async def get_other_documents(request: Request, studtblId: str, ocrStatus: str = "others"):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/document/others")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Document/GetOtherDocumentsByStudent"
     
@@ -793,6 +908,10 @@ async def get_other_documents(request: Request, studtblId: str, ocrStatus: str =
 @app.get("/api/document/endorsement-list")
 async def get_endorsement_list(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/document/endorsement-list")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Endorsement/GetEndorsementList"
     
@@ -818,6 +937,10 @@ async def get_professional_course_list(request: Request, endorsementId: int = 1)
 @app.get("/api/document/endorsement-certificates")
 async def get_endorsement_certificates(request: Request, studtblId: str, endorsementId: int = 1, searchText: str = ""):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/document/endorsement-certificates")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Endorsement/GetEndorsementCertificateList"
     
@@ -831,6 +954,10 @@ async def get_endorsement_certificates(request: Request, studtblId: str, endorse
 @app.get("/api/document/endorsement-courses")
 async def get_endorsement_courses(request: Request, studtblId: str, professionalCourseId: int = 1):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/document/endorsement-courses")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Endorsement/GetEndorsementCourseList"
     
@@ -845,6 +972,10 @@ async def get_endorsement_courses(request: Request, studtblId: str, professional
 async def download_document_blob(request: Request, studtblId: str, documentId: str):
     studtblId = fix_id(studtblId)
     documentId = fix_id(documentId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/document/download-blob")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Document/DownloadBlob"
     
@@ -887,6 +1018,10 @@ async def get_report_menu(request: Request):
 @app.get("/api/reports/filters")
 async def get_report_filters(request: Request, reportSubId: int, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/reports/filters")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Report/GetReportFilterByReportId"
     
@@ -975,6 +1110,10 @@ async def download_report(request: Request):
 async def get_report(request: Request, studtblId: str, type: str):
     """Legacy endpoint - returns filter data for the selected report type."""
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/reports")
+
     report_map = {"attendance": 9, "cat": 1, "endsem": 5}
     report_sub_id = report_map.get(type.lower(), 9)
     
@@ -1042,6 +1181,10 @@ def _extract_attendance_data(json_data, inst_id: str = "SEC"):
 @app.get("/api/attendance/course-detail")
 async def get_attendance_course_detail(request: Request, studtblId: str):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/attendance/course-detail")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceCourseDetail"
     params = build_attendance_params(request)
@@ -1076,6 +1219,9 @@ async def get_attendance_course_detail(request: Request, studtblId: str):
 
 @app.get("/api/attendance/daily-detail")
 async def get_attendance_daily_detail(request: Request, studtblId: str):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/attendance/daily-detail")
+
     base_url, headers = get_institution_config(request)
     params = build_attendance_params(request)
     params["studtblId"] = fix_id(studtblId)
@@ -1113,6 +1259,9 @@ async def get_attendance_daily_detail(request: Request, studtblId: str):
 
 @app.get("/api/attendance/overall-detail")
 async def get_attendance_overall_detail(request: Request, studtblId: str):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/attendance/overall-detail")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetAttendanceOverAllDetail"
     params = build_attendance_params(request)
@@ -1131,6 +1280,9 @@ async def get_attendance_overall_detail(request: Request, studtblId: str):
 
 @app.get("/api/attendance/leave-status")
 async def get_leave_status(request: Request, studtblId: str):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/attendance/leave-status")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetLeaveStatusByStudent"
     params = build_attendance_params(request)
@@ -1173,6 +1325,9 @@ async def get_inbox(request: Request, receiver_id: str):
 
 @app.get("/api/profile/identifiers")
 async def get_identifiers(request: Request, studtblId: str):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/profile/identifiers")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentIdentifiersById"
     try:
@@ -1184,6 +1339,9 @@ async def get_identifiers(request: Request, studtblId: str):
 
 @app.get("/api/profile/achievements/studies")
 async def get_achievement_studies(request: Request, studtblId: str):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/profile/achievements/studies")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Achievements/GetAchievementStudies"
     try:
@@ -1195,6 +1353,9 @@ async def get_achievement_studies(request: Request, studtblId: str):
 
 @app.get("/api/profile/achievements/nptel")
 async def get_achievement_nptel(request: Request, studtblId: str):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/profile/achievements/nptel")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Achievements/GetNPTELSemesterList"
     try:
@@ -1206,6 +1367,9 @@ async def get_achievement_nptel(request: Request, studtblId: str):
 
 @app.get("/api/profile/achievements/amcat")
 async def get_achievement_amcat(request: Request, studtblId: str):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/profile/achievements/amcat")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Achievements/GetAmcatPgpaHeaderList"
     try:
@@ -1217,6 +1381,9 @@ async def get_achievement_amcat(request: Request, studtblId: str):
 
 @app.get("/api/profile/course-details")
 async def get_course_details(request: Request, studtblId: str, regulationId: str, branchId: str, semesterId: str, pageNumber: str = "1", pageSize: str = "100"):
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/profile/course-details")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Student/GetStudentCourseDetails"
     params = {
@@ -1295,6 +1462,10 @@ async def get_message_details(request: Request, categoryGuid: str, messageGuid: 
 @app.get("/api/inbox/download-doc")
 async def download_inbox_doc(request: Request, studtblId: str, documentId: str, documentType: str = "MENTORING_DOC"):
     studtblId = fix_id(studtblId)
+
+    # SECURITY: Validate user owns this resource
+    await validate_request_authorization(request, studtblId, "/api/inbox/download-doc")
+
     base_url, headers = get_institution_config(request)
     upstream_url = f"{base_url}/Document/DownloadBlob"
     params = {"documentId": documentId, "studtblId": studtblId, "documentType": documentType}
