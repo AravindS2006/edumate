@@ -138,7 +138,7 @@ INSTITUTIONS = {
 }
 
 DEFAULT_INSTITUTION = "SEC"
-TEST_TOKEN_SECRET = os.environ.get("TEST_TOKEN_SECRET", "edumate_test_secret")
+TEST_TOKEN_SECRET = os.environ.get("TEST_TOKEN_SECRET") or hashlib.sha256(os.urandom(32)).hexdigest()
 MOCK_PDF_CONTENT = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
 TEST_FIRST_NAMES = ["Arjun", "Kavin", "Nithin", "Rithik", "Vignesh", "Harini", "Keerthana", "Priya"]
 TEST_LAST_NAMES = ["Kumar", "Raj", "S", "M", "R", "N", "T", "Balan"]
@@ -188,6 +188,8 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
         return None
     token = auth_header[7:]
     try:
+        # NOTE: Used only to detect locally-issued test tokens for mock responses.
+        # Real authorization continues to be enforced by validate_request_authorization().
         payload = jwt.decode(token, options={"verify_signature": False})
     except Exception:
         return None
