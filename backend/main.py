@@ -138,7 +138,7 @@ INSTITUTIONS = {
 }
 
 DEFAULT_INSTITUTION = "SEC"
-TEST_TOKEN_SECRET = os.environ.get("TEST_TOKEN_SECRET") or hashlib.sha256(os.urandom(32)).hexdigest()
+TEST_TOKEN_SECRET = os.environ.get("TEST_TOKEN_SECRET") or hashlib.sha256(f"{LOGS_SECRET_KEY}-test-token".encode()).hexdigest()
 MOCK_PDF_CONTENT = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
 TEST_FIRST_NAMES = ["Arjun", "Kavin", "Nithin", "Rithik", "Vignesh", "Harini", "Keerthana", "Priya"]
 TEST_LAST_NAMES = ["Kumar", "Raj", "S", "M", "R", "N", "T", "Balan"]
