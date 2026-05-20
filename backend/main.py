@@ -138,6 +138,11 @@ INSTITUTIONS = {
 }
 
 DEFAULT_INSTITUTION = "SEC"
+TEST_TOKEN_SECRET = os.environ.get("TEST_TOKEN_SECRET", "edumate_test_secret")
+MOCK_PDF_CONTENT = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
+TEST_FIRST_NAMES = ["Arjun", "Kavin", "Nithin", "Rithik", "Vignesh", "Harini", "Keerthana", "Priya"]
+TEST_LAST_NAMES = ["Kumar", "Raj", "S", "M", "R", "N", "T", "Balan"]
+TEST_BRANCHES = [("CSE", "CS"), ("ECE", "EC"), ("EEE", "EE"), ("IT", "IT"), ("MECH", "ME")]
 
 def get_institution_config(request: Request):
     """
@@ -199,16 +204,13 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
     seed = _test_seed(studtbl_id, inst_id)
     rng = random.Random(seed)
 
-    first_names = ["Arjun", "Kavin", "Nithin", "Rithik", "Vignesh", "Harini", "Keerthana", "Priya"]
-    last_names = ["Kumar", "Raj", "S", "M", "R", "N", "T", "Balan"]
-    branches = [("CSE", "CS"), ("ECE", "EC"), ("EEE", "EE"), ("IT", "IT"), ("MECH", "ME")]
-    branch_name, branch_code = branches[rng.randint(0, len(branches) - 1)]
+    branch_name, branch_code = TEST_BRANCHES[rng.randint(0, len(TEST_BRANCHES) - 1)]
     sem = rng.randint(3, 8)
     year_of_study = min(4, max(2, (sem + 1) // 2))
     section = ["A", "B", "C"][rng.randint(0, 2)]
     roll_suffix = rng.randint(101, 999)
     reg_no = f"{inst_id}{str(rng.randint(21, 24)).zfill(2)}{branch_code}{roll_suffix}"
-    name = f"{first_names[rng.randint(0, len(first_names)-1)]} {last_names[rng.randint(0, len(last_names)-1)]}"
+    name = f"{TEST_FIRST_NAMES[rng.randint(0, len(TEST_FIRST_NAMES)-1)]} {TEST_LAST_NAMES[rng.randint(0, len(TEST_LAST_NAMES)-1)]}"
     attendance = round(rng.uniform(78.2, 96.3), 2)
     cgpa = round(rng.uniform(7.4, 9.6), 2)
     pgpa = round(min(10, cgpa + rng.uniform(-0.4, 0.6)), 2)
@@ -277,7 +279,7 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
             "absent_percentage": absent_pct,
             "program": "B.E.",
             "branch_code": branch_code,
-            "mentor_name": f"Dr. {last_names[rng.randint(0, len(last_names)-1)]}",
+            "mentor_name": f"Dr. {TEST_LAST_NAMES[rng.randint(0, len(TEST_LAST_NAMES)-1)]}",
             "total_semesters": 8,
             "total_years": 4,
             "pgpa": pgpa
@@ -307,7 +309,7 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
             "batch": "2022-2026",
             "admission_mode": "Counselling",
             "university_reg_no": f"UNIV{rng.randint(100000, 999999)}",
-            "mentor_name": f"Dr. {last_names[rng.randint(0, len(last_names)-1)]}",
+            "mentor_name": f"Dr. {TEST_LAST_NAMES[rng.randint(0, len(TEST_LAST_NAMES)-1)]}",
             "hostel": rng.randint(0, 1) == 1,
             "bus_code": f"B{rng.randint(1, 30)}",
             "current_academic_year": academic_year,
@@ -325,13 +327,13 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
             ]
         },
         "parent": {
-            "father_name": f"{last_names[rng.randint(0, len(last_names)-1)]} Kumar",
+            "father_name": f"{TEST_LAST_NAMES[rng.randint(0, len(TEST_LAST_NAMES)-1)]} Kumar",
             "father_occupation": "Business",
             "father_mobile": father_mobile,
-            "mother_name": f"{last_names[rng.randint(0, len(last_names)-1)]} Priya",
+            "mother_name": f"{TEST_LAST_NAMES[rng.randint(0, len(TEST_LAST_NAMES)-1)]} Priya",
             "mother_occupation": "Teacher",
             "mother_mobile": mother_mobile,
-            "guardian_name": f"{last_names[rng.randint(0, len(last_names)-1)]} Rajan",
+            "guardian_name": f"{TEST_LAST_NAMES[rng.randint(0, len(TEST_LAST_NAMES)-1)]} Rajan",
             "guardian_occupation": "Engineer",
             "guardian_mobile": f"6{rng.randint(100000000, 999999999)}"
         },
@@ -393,7 +395,7 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
         },
         "documents": {
             "uploaded": [
-                {"id": "DOC101", "uploadedGuidId": "UGID101", "documentCode": "AADHAR", "documentName": "Aadhar Card", "description": "Identity proof", "ocrStatus": "Classified", "uploadedDate": "2026-01-14", "documentNumber": "XXXX-XXXX-4821", "remarks": "Verified"},
+                {"id": "DOC101", "uploadedGuidId": "UGID101", "documentCode": "AADHAR", "documentName": "Aadhaar Card", "description": "Identity proof", "ocrStatus": "Classified", "uploadedDate": "2026-01-14", "documentNumber": "XXXX-XXXX-4821", "remarks": "Verified"},
                 {"id": "DOC102", "uploadedGuidId": "UGID102", "documentCode": "HSC", "documentName": "HSC Marksheet", "description": "Academic proof", "ocrStatus": "Updated", "uploadedDate": "2026-01-16", "documentNumber": None, "remarks": "Verified"}
             ],
             "others": [
@@ -522,11 +524,9 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
         mock_studtbl_id = base64.b64encode(mock_raw_id.encode()).decode()
         mock_seed = _test_seed(mock_studtbl_id, inst_id)
         mock_rng = random.Random(mock_seed)
-        first_names = ["Arjun", "Kavin", "Nithin", "Rithik", "Vignesh", "Harini", "Keerthana", "Priya"]
-        last_names = ["Kumar", "Raj", "S", "M", "R", "N", "T", "Balan"]
-        branch_code = ["CS", "EC", "EE", "IT", "ME"][mock_rng.randint(0, 4)]
+        branch_code = TEST_BRANCHES[mock_rng.randint(0, len(TEST_BRANCHES) - 1)][1]
         mock_context = {
-            "name": f"{first_names[mock_rng.randint(0, len(first_names)-1)]} {last_names[mock_rng.randint(0, len(last_names)-1)]}",
+            "name": f"{TEST_FIRST_NAMES[mock_rng.randint(0, len(TEST_FIRST_NAMES)-1)]} {TEST_LAST_NAMES[mock_rng.randint(0, len(TEST_LAST_NAMES)-1)]}",
             "reg_no": f"{inst_id}{str(mock_rng.randint(21, 24)).zfill(2)}{branch_code}{mock_rng.randint(101, 999)}"
         }
         now = int(time.time())
@@ -540,7 +540,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
             "iat": now,
             "exp": now + 86400
         }
-        token = jwt.encode(token_payload, "edumate_test_secret", algorithm="HS256")
+        token = jwt.encode(token_payload, TEST_TOKEN_SECRET, algorithm="HS256")
         return {
             "status": "success",
             "token": token,
@@ -1190,9 +1190,8 @@ class HallTicketDownloadRequest(BaseModel):
 async def download_hallticket_pdf(request: Request, payload: HallTicketDownloadRequest):
     test_ctx = _get_test_context(request, payload.studtblId)
     if test_ctx:
-        pdf_bytes = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
         return StreamingResponse(
-            content=iter([pdf_bytes]),
+            content=iter([MOCK_PDF_CONTENT]),
             status_code=200,
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=HallTicket.pdf"}
@@ -1417,9 +1416,8 @@ async def download_report(request: Request):
     body = await request.json()
     test_ctx = _get_test_context(request, body.get("studtblId"))
     if test_ctx:
-        pdf_bytes = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
         return Response(
-            content=pdf_bytes,
+            content=MOCK_PDF_CONTENT,
             media_type="application/pdf",
             status_code=200,
             headers={"Content-Disposition": "inline; filename=MockReport.pdf"}
