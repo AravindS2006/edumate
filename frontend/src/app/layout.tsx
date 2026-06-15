@@ -23,14 +23,14 @@ export const metadata: Metadata = {
   referrer: "origin-when-cross-origin",
   creator: "Sairam Techno Incubator",
   publisher: "Sri Sairam Engineering College",
-  metadataBase: new URL('https://edumate-sairam.vercel.app'),
+  metadataBase: new URL('https://edumate1-sairam.vercel.app'),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     title: "EduMate — Modern Sairam Student Portal (SEC & SIT)",
     description: "The unified modern dashboard for SEC and SIT students. Access attendance, marks, and more.",
-    url: "https://edumate-sairam.vercel.app",
+    url: "https://edumate1-sairam.vercel.app",
     siteName: "EduMate",
     images: [
       {
@@ -80,10 +80,10 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "EduMate",
-    "url": "https://edumate-sairam.vercel.app",
+    "url": "https://edumate1-sairam.vercel.app",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://edumate-sairam.vercel.app/?q={search_term_string}",
+      "target": "https://edumate1-sairam.vercel.app/?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   },
@@ -91,8 +91,8 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Sri Sairam Engineering College",
-    "url": "https://edumate-sairam.vercel.app",
-    "logo": "https://edumate-sairam.vercel.app/assets/SAIRAM-ROUND-LOGO.png",
+    "url": "https://edumate1-sairam.vercel.app",
+    "logo": "https://edumate1-sairam.vercel.app/assets/SAIRAM-ROUND-LOGO.png",
     "sameAs": [
       "https://sairam.edu.in/",
       "https://sairamgroup.in/",
