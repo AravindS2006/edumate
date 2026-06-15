@@ -139,6 +139,8 @@ INSTITUTIONS = {
 
 DEFAULT_INSTITUTION = "SEC"
 TEST_TOKEN_SECRET = os.environ.get("TEST_TOKEN_SECRET") or hashlib.sha256(f"{LOGS_SECRET_KEY}-test-token".encode()).hexdigest()
+PROXY_TOKEN_SECRET = os.environ.get("PROXY_TOKEN_SECRET") or hashlib.sha256(f"{LOGS_SECRET_KEY}-proxy-token".encode()).hexdigest()
+PROXY_TOKEN_ISSUER = "edumate-proxy"
 MOCK_PDF_CONTENT = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
 TEST_FIRST_NAMES = ["Arjun", "Kavin", "Nithin", "Rithik", "Vignesh", "Harini", "Keerthana", "Priya"]
 TEST_LAST_NAMES = ["Kumar", "Raj", "S", "M", "R", "N", "T", "Balan"]
@@ -155,13 +157,23 @@ def get_institution_config(request: Request):
         
     config = INSTITUTIONS[inst_id]
     
+    authorization = request.headers.get("Authorization", "")
+    if authorization.startswith("Bearer "):
+        token = authorization[7:]
+        try:
+            payload = jwt.decode(token, PROXY_TOKEN_SECRET, algorithms=["HS256"])
+            if payload.get("iss") == PROXY_TOKEN_ISSUER and payload.get("upstream_token"):
+                authorization = "Bearer " + str(payload.get("upstream_token"))
+        except Exception:
+            pass
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": config["Referer"],
         "Origin": config["Origin"],
         "Content-Type": "application/json",
         "institutionguid": config["institutionguid"],
-        "Authorization": request.headers.get("Authorization", "")
+        "Authorization": authorization
     }
     
     return config["BASE_URL"], headers
@@ -469,12 +481,28 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
             
             if response.status_code == 200:
                 data = response.json()
+                now = int(time.time())
+                inst_id = request.headers.get("X-Institution-Id", DEFAULT_INSTITUTION).upper()
+                upstream_token = data.get("idToken")
+                proxy_payload = {
+                    "iss": PROXY_TOKEN_ISSUER,
+                    "sub": data.get("userId"),
+                    "studtblId": data.get("userId"),
+                    "upstream_token": upstream_token,
+                    "inst_id": inst_id,
+                    "name": data.get("name"),
+                    "reg_no": data.get("regNo"),
+                    "iat": now,
+                    "exp": now + 86400
+                }
+                proxy_token = jwt.encode(proxy_payload, PROXY_TOKEN_SECRET, algorithm="HS256")
                 
                 # Fetch Name from Personal Details for better logging
                 student_name = "Unknown"
                 try:
                     # Update headers with the new token
                     headers["Authorization"] = f"Bearer {data.get('idToken')}"
+                    headers["Authorization"] = "Bearer " + str(upstream_token or "")
                     pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
                     if pers_resp.status_code == 200:
                         p_data = pers_resp.json()
@@ -504,7 +532,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                     background_tasks.add_task(sheets_logger.log_login, user_details)
 
                 return {
-                    "token": data.get("idToken"),
+                    "token": proxy_token,
                     "studtblId": data.get("userId"),
                     "user_data": data 
                 }
