@@ -172,7 +172,14 @@ def get_institution_config(request: Request):
             upstream_token = payload.get("upstream_token")
             if isinstance(upstream_token, str) and upstream_token.strip():
                 authorization = "Bearer " + upstream_token
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            audit_logger.log_event(
+                event_type="PROXY_TOKEN_INVALID",
+                user_id="unknown",
+                ip_address=request.client.host if request.client else "unknown",
+                status="blocked",
+                details={"reason": str(e)[:200]}
+            )
             pass
 
     headers = {
@@ -493,7 +500,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                 inst_id = request.headers.get("X-Institution-Id", DEFAULT_INSTITUTION).upper()
                 upstream_token = data.get("idToken")
                 if not isinstance(upstream_token, str) or not upstream_token.strip():
-                    raise HTTPException(status_code=502, detail="Upstream authentication token missing")
+                    raise HTTPException(status_code=502, detail="Invalid upstream authentication response: token missing or empty")
                 proxy_payload = {
                     "iss": PROXY_TOKEN_ISSUER,
                     "sub": data.get("userId"),
@@ -511,7 +518,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                 student_name = "Unknown"
                 try:
                     # Update headers with the new token
-                    headers["Authorization"] = "Bearer " + str(upstream_token or "")
+                    headers["Authorization"] = "Bearer " + upstream_token
                     pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
                     if pers_resp.status_code == 200:
                         p_data = pers_resp.json()
