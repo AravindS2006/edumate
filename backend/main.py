@@ -167,10 +167,11 @@ def get_institution_config(request: Request):
                 PROXY_TOKEN_SECRET,
                 algorithms=["HS256"],
                 issuer=PROXY_TOKEN_ISSUER,
-                options={"require": ["exp", "iss", "sub"]}
+                options={"require": ["exp", "iss", "sub", "upstream_token"]}
             )
-            if payload.get("upstream_token"):
-                authorization = "Bearer " + str(payload.get("upstream_token"))
+            upstream_token = payload.get("upstream_token")
+            if isinstance(upstream_token, str) and upstream_token.strip():
+                authorization = "Bearer " + upstream_token
         except jwt.InvalidTokenError:
             pass
 
@@ -491,6 +492,8 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                 now = int(time.time())
                 inst_id = request.headers.get("X-Institution-Id", DEFAULT_INSTITUTION).upper()
                 upstream_token = data.get("idToken")
+                if not isinstance(upstream_token, str) or not upstream_token.strip():
+                    raise HTTPException(status_code=502, detail="Upstream authentication token missing")
                 proxy_payload = {
                     "iss": PROXY_TOKEN_ISSUER,
                     "sub": data.get("userId"),
