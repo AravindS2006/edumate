@@ -498,13 +498,14 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                 data = response.json()
                 now = int(time.time())
                 inst_id = request.headers.get("X-Institution-Id", DEFAULT_INSTITUTION).upper()
+                user_id = data.get("userId")
                 upstream_token = data.get("idToken")
                 if not isinstance(upstream_token, str) or not upstream_token.strip():
-                    raise HTTPException(status_code=502, detail="Invalid upstream authentication response: token missing or empty")
+                    raise HTTPException(status_code=502, detail="Authentication failed")
                 proxy_payload = {
                     "iss": PROXY_TOKEN_ISSUER,
-                    "sub": data.get("userId"),
-                    "studtblId": data.get("userId"),
+                    "sub": user_id,
+                    "studtblId": user_id,
                     "upstream_token": upstream_token,
                     "inst_id": inst_id,
                     "name": data.get("name"),
@@ -519,7 +520,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                 try:
                     # Update headers with the new token
                     headers["Authorization"] = "Bearer " + upstream_token
-                    pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
+                    pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": user_id}, headers=headers)
                     if pers_resp.status_code == 200:
                         p_data = pers_resp.json()
                         # Some APIs return {"data": {"studentName": ...}}, others return {"studentName": ...}
@@ -549,7 +550,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
 
                 return {
                     "token": proxy_token,
-                    "studtblId": data.get("userId"),
+                    "studtblId": user_id,
                     "user_data": data 
                 }
             else:
