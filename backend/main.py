@@ -501,7 +501,6 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                 student_name = "Unknown"
                 try:
                     # Update headers with the new token
-                    headers["Authorization"] = f"Bearer {data.get('idToken')}"
                     headers["Authorization"] = "Bearer " + str(upstream_token or "")
                     pers_resp = await client.get(f"{base_url}/Student/GetStudentPersonalDetails", params={"studtblId": data.get("userId")}, headers=headers)
                     if pers_resp.status_code == 200:
