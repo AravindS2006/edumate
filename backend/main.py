@@ -138,6 +138,7 @@ INSTITUTIONS = {
 }
 
 DEFAULT_INSTITUTION = "SEC"
+TOKEN_EXPIRY_SECONDS = 86400
 TEST_TOKEN_SECRET = os.environ.get("TEST_TOKEN_SECRET") or hashlib.sha256(f"{LOGS_SECRET_KEY}-test-token".encode()).hexdigest()
 PROXY_TOKEN_SECRET = os.environ.get("PROXY_TOKEN_SECRET") or hashlib.sha256(f"{LOGS_SECRET_KEY}-proxy-token".encode()).hexdigest()
 PROXY_TOKEN_ISSUER = "edumate-proxy"
@@ -161,10 +162,16 @@ def get_institution_config(request: Request):
     if authorization.startswith("Bearer "):
         token = authorization[7:]
         try:
-            payload = jwt.decode(token, PROXY_TOKEN_SECRET, algorithms=["HS256"])
-            if payload.get("iss") == PROXY_TOKEN_ISSUER and payload.get("upstream_token"):
+            payload = jwt.decode(
+                token,
+                PROXY_TOKEN_SECRET,
+                algorithms=["HS256"],
+                issuer=PROXY_TOKEN_ISSUER,
+                options={"require": ["exp", "iss", "sub"]}
+            )
+            if payload.get("upstream_token"):
                 authorization = "Bearer " + str(payload.get("upstream_token"))
-        except Exception:
+        except jwt.InvalidTokenError:
             pass
 
     headers = {
@@ -493,7 +500,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                     "name": data.get("name"),
                     "reg_no": data.get("regNo"),
                     "iat": now,
-                    "exp": now + 86400
+                    "exp": now + TOKEN_EXPIRY_SECONDS
                 }
                 proxy_token = jwt.encode(proxy_payload, PROXY_TOKEN_SECRET, algorithm="HS256")
                 
@@ -567,7 +574,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
             "is_test_user": True,
             "inst_id": inst_id,
             "iat": now,
-            "exp": now + 86400
+            "exp": now + TOKEN_EXPIRY_SECONDS
         }
         token = jwt.encode(token_payload, TEST_TOKEN_SECRET, algorithm="HS256")
         return {
