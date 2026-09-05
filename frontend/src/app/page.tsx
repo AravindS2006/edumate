@@ -55,6 +55,19 @@ export default function Home() {
         if (data.access_token) localStorage.setItem('token', data.access_token);
         localStorage.setItem('institutionId', institution);
 
+        void fetch('/api/log-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: username,
+            timestamp: new Date().toISOString(),
+            institution,
+            studtblId: data.studtblId ?? null,
+          }),
+        }).catch((logError) => {
+          console.error('Failed to log login event:', logError);
+        });
+
         if (!data.studtblId && !data.token && !data.access_token) {
           console.warn("No token/id found in response");
         }
