@@ -115,14 +115,15 @@ def extract_user_id_from_token(token: str, verify: bool = False) -> Optional[str
         # The upstream ERP will validate the signature
         decoded = jwt.decode(token, options={"verify_signature": verify})
 
-        # Try common JWT claim names for user ID
+        # Try common JWT claim names for user ID.
+        # Prefer ERP/student identifiers over generic identity-provider subject IDs.
         user_id = (
-            decoded.get('sub') or
+            decoded.get('studtblId') or
             decoded.get('userId') or
             decoded.get('user_id') or
-            decoded.get('studtblId') or
             decoded.get('studentId') or
-            decoded.get('id')
+            decoded.get('id') or
+            decoded.get('sub')
         )
 
         return user_id
