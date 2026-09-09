@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, Response, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, Response, Query, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -20,7 +20,11 @@ from security import (
     enforce_rate_limit,
     sanitize_input,
     audit_logger,
-    validate_studtbl_id_format
+    validate_studtbl_id_format,
+    security as security_scheme,
+    create_access_token,
+    register_session,
+    extract_upstream_token
 )
 
 # SECRET KEY for accessing logs — must be set via environment variable in production
@@ -51,7 +55,9 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url=None if is_production else "/docs",
     redoc_url=None if is_production else "/redoc",
-    openapi_url=None if is_production else "/openapi.json"
+    openapi_url=None if is_production else "/openapi.json",
+    dependencies=[Depends(security_scheme)],
+    swagger_ui_parameters={"persistAuthorization": True}
 )
 
 @app.get("/api/health")
@@ -155,13 +161,21 @@ def get_institution_config(request: Request):
         
     config = INSTITUTIONS[inst_id]
     
+    auth_header = request.headers.get("Authorization", "")
+    upstream_auth = auth_header
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        upstream_token = extract_upstream_token(token)
+        if upstream_token:
+            upstream_auth = f"Bearer {upstream_token}"
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": config["Referer"],
         "Origin": config["Origin"],
         "Content-Type": "application/json",
         "institutionguid": config["institutionguid"],
-        "Authorization": request.headers.get("Authorization", "")
+        "Authorization": upstream_auth
     }
     
     return config["BASE_URL"], headers
@@ -503,9 +517,26 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
                     }
                     background_tasks.add_task(sheets_logger.log_login, user_details)
 
+                user_studtbl_id = data.get("userId")
+                # Register mapping in session cache
+                register_session(data.get("localId"), user_studtbl_id, data.get("idToken"))
+
+                token_payload = {
+                    "sub": user_studtbl_id,
+                    "studtblId": user_studtbl_id,
+                    "userId": user_studtbl_id,
+                    "email": data.get("email"),
+                    "reg_no": data.get("studentRegistrationNo") or credentials.username,
+                    "name": student_name,
+                    "upstream_token": data.get("idToken"),
+                    "is_test_user": False
+                }
+                session_token = create_access_token(token_payload)
+
                 return {
-                    "token": data.get("idToken"),
-                    "studtblId": data.get("userId"),
+                    "token": session_token,
+                    "access_token": session_token,
+                    "studtblId": user_studtbl_id,
                     "user_data": data 
                 }
             else:
@@ -535,6 +566,7 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
         token_payload = {
             "sub": mock_studtbl_id,
             "studtblId": mock_studtbl_id,
+            "userId": mock_studtbl_id,
             "reg_no": mock_context.get("reg_no", credentials.username),
             "name": mock_context.get("name", "Test Student"),
             "is_test_user": True,
@@ -542,10 +574,12 @@ async def login(request: Request, credentials: LoginRequest, background_tasks: B
             "iat": now,
             "exp": now + 86400
         }
-        token = jwt.encode(token_payload, TEST_TOKEN_SECRET, algorithm="HS256")
+        token = create_access_token(token_payload, expires_delta_seconds=86400)
+        register_session(mock_studtbl_id, mock_studtbl_id, token)
         return {
             "status": "success",
             "token": token,
+            "access_token": token,
             "studtblId": mock_studtbl_id,
             "user": {
                 "name": token_payload["name"],

@@ -6,6 +6,7 @@ Handles JWT validation, authorization, rate limiting, and audit logging.
 from fastapi import HTTPException, Request, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Dict, Any
+import os
 import jwt
 import base64
 import hashlib
@@ -22,8 +23,39 @@ logger = logging.getLogger(__name__)
 JWT_ALGORITHM = "HS256"  # Default algorithm, will auto-detect from token
 TOKEN_TOLERANCE = 300  # 5 minutes tolerance for clock skew
 
-# HTTPBearer security scheme
-security = HTTPBearer()
+JWT_SECRET_RAW = os.environ.get("JWT_SECRET") or os.environ.get("LOGS_SECRET_KEY") or "edumate_admin_secret"
+JWT_SECRET = hashlib.sha256(f"{JWT_SECRET_RAW}-edumate-token".encode()).hexdigest()
+
+# In-memory mapping from Firebase UID / raw token to studtblId for session resolution
+SESSION_CACHE: Dict[str, str] = {}
+
+def register_session(firebase_uid: Optional[str], studtbl_id: str, id_token: Optional[str] = None):
+    """Map Firebase user ID and/or token to studtblId for session resolution."""
+    if firebase_uid:
+        SESSION_CACHE[firebase_uid] = studtbl_id
+    if id_token:
+        SESSION_CACHE[id_token] = studtbl_id
+
+def create_access_token(payload: Dict[str, Any], expires_delta_seconds: int = 86400 * 30) -> str:
+    """Create a signed JWT session token for Edumate."""
+    to_encode = payload.copy()
+    now = int(time.time())
+    to_encode.setdefault("iat", now)
+    to_encode.setdefault("exp", now + expires_delta_seconds)
+    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def extract_upstream_token(token: str) -> Optional[str]:
+    """Extract upstream Firebase token from Edumate session token if present."""
+    try:
+        if token.startswith('Bearer '):
+            token = token[7:]
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        return decoded.get("upstream_token")
+    except Exception:
+        return None
+
+# HTTPBearer security scheme (auto_error=False for OpenAPI/Swagger UI integration)
+security = HTTPBearer(auto_error=False)
 
 
 class SecurityAuditLogger:
@@ -94,39 +126,45 @@ def decode_studtbl_id(studtbl_id: str) -> Optional[str]:
 
 def extract_user_id_from_token(token: str, verify: bool = False) -> Optional[str]:
     """
-    Extract user ID from JWT token without verification.
-
-    Since we're acting as a proxy and the upstream ERP validates the token,
-    we extract the user ID to validate ownership without needing the signing key.
+    Extract user ID from JWT token.
+    Prioritizes Edumate session tokens with studtblId, and resolves Firebase tokens via session cache.
 
     Args:
         token: JWT token string
         verify: Whether to verify signature (default False for proxy mode)
 
     Returns:
-        User ID from token or None if extraction fails
+        User ID (studtblId) from token or None if extraction fails
     """
     try:
         # Remove 'Bearer ' prefix if present
         if token.startswith('Bearer '):
             token = token[7:]
 
+        # Fast lookup in session cache if raw token was registered during login
+        if token in SESSION_CACHE:
+            return SESSION_CACHE[token]
+
         # Decode JWT without verification (we're validating ownership, not signature)
-        # The upstream ERP will validate the signature
         decoded = jwt.decode(token, options={"verify_signature": verify})
 
-        # Try common JWT claim names for user ID.
-        # Prefer ERP/student identifiers over generic identity-provider subject IDs.
+        # 1. Prefer explicit ERP student table ID claims from Edumate session tokens
         user_id = (
             decoded.get('studtblId') or
             decoded.get('userId') or
-            decoded.get('user_id') or
-            decoded.get('studentId') or
-            decoded.get('id') or
-            decoded.get('sub')
+            decoded.get('studentId')
         )
+        if user_id:
+            return str(user_id)
 
-        return user_id
+        # 2. If it's a Firebase token (claims: user_id, sub), check if mapped in SESSION_CACHE
+        firebase_uid = decoded.get('user_id') or decoded.get('sub')
+        if firebase_uid and str(firebase_uid) in SESSION_CACHE:
+            return SESSION_CACHE[str(firebase_uid)]
+
+        # 3. Fallback to generic claims
+        fallback_id = decoded.get('user_id') or decoded.get('id') or decoded.get('sub')
+        return str(fallback_id) if fallback_id else None
     except jwt.ExpiredSignatureError:
         logger.warning("Token has expired")
         return None
