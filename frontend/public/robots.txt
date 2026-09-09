@@ -7,7 +7,7 @@ Disallow: /api
 Disallow: /api/*
 
 # Host
-Host: https://edumate-sairam.vercel.app
+Host: https://edumate1-sairam.vercel.app
 
 # Sitemaps
-Sitemap: https://edumate-sairam.vercel.app/sitemap.xml
+Sitemap: https://edumate1-sairam.vercel.app/sitemap.xml

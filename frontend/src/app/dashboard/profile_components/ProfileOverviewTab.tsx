@@ -1,6 +1,16 @@
 import { User, Phone, Mail, MapPin, GraduationCap, Users } from 'lucide-react';
 
-export default function ProfileOverviewTab({ personal, academic, parent }: { personal: any, academic: any, parent: any }) {
+export default function ProfileOverviewTab({
+    personal,
+    academic,
+    parent,
+    clubs
+}: {
+    personal: any;
+    academic: any;
+    parent: any;
+    clubs?: any[];
+}) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Personal Details Card */}
@@ -69,6 +79,51 @@ export default function ProfileOverviewTab({ personal, academic, parent }: { per
                     <InfoField label="Academic Year" value={academic?.current_academic_year} />
                 </div>
             </div>
+
+            {/* Student Clubs & Societies Card */}
+            {clubs && clubs.length > 0 && (
+                <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-5 sm:space-y-6 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <Users className="text-indigo-500" size={18} />
+                            Clubs & Societies
+                        </h3>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                            {clubs.length} Active {clubs.length === 1 ? 'Club' : 'Clubs'}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {clubs.map((club: any, idx: number) => (
+                            <div key={idx} className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/20 border border-slate-200/70 space-y-2 hover:border-indigo-300 transition-colors">
+                                <div className="flex items-start justify-between gap-2">
+                                    <h4 className="text-sm font-black text-slate-800 leading-snug">
+                                        {club.clubName || club.club_Name || club.name || 'Club'}
+                                    </h4>
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex-shrink-0">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        {club.status || 'Active'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <span className="px-2 py-0.5 rounded-lg bg-indigo-100/70 text-indigo-700 font-bold text-[11px]">
+                                        {club.role || 'Member'}
+                                    </span>
+                                    {(club.academicYear || club.academic_Year) && (
+                                        <span className="text-slate-500 text-[11px] font-medium">
+                                            • AY {club.academicYear || club.academic_Year}
+                                        </span>
+                                    )}
+                                </div>
+                                {(club.dateOfJoining || club.date_Of_Joining) && (
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        Joined: {club.dateOfJoining || club.date_Of_Joining}
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Parent Details Card */}
             {parent && (

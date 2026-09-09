@@ -459,6 +459,196 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
                 "mentoringDocumentName": "mentor-note.pdf",
                 "studentDocumentId": None
             }
+        },
+        "timetable": {
+            "success": True,
+            "message": "Weekly Timetable retrieved successfully.",
+            "data": [
+                {
+                    "day": "MON",
+                    "timeSlots": {
+                        "9:00AM - 9:50AM": f"{branch_code}301-Machine Learning ~ 41201 ~ Machine Learning Lecture",
+                        "9:50AM - 10:40AM": f"{branch_code}302-Compiler Design ~ 41202 ~ Compiler Design",
+                        "10:55AM - 11:45AM": f"{branch_code}303-Computer Networks ~ 41203 ~ Computer Networks",
+                        "11:45AM - 12:35PM": f"{branch_code}304-Cloud Computing ~ 41204 ~ Cloud Computing",
+                        "1:25PM - 2:15PM": f"{branch_code}PL01-AI Lab ~ 42524 ~ Artificial Intelligence Lab",
+                        "2:15PM - 3:05PM": f"{branch_code}PL01-AI Lab ~ 42524 ~ Artificial Intelligence Lab",
+                        "3:20PM - 4:10PM": "Library / Skillrack ~ 40001 ~ Self Study"
+                    }
+                },
+                {
+                    "day": "TUE",
+                    "timeSlots": {
+                        "9:00AM - 9:50AM": f"{branch_code}303-Computer Networks ~ 41203 ~ Computer Networks",
+                        "9:50AM - 10:40AM": f"{branch_code}301-Machine Learning ~ 41201 ~ Machine Learning",
+                        "10:55AM - 11:45AM": f"{branch_code}305-Web Technologies ~ 41205 ~ Web Technologies",
+                        "11:45AM - 12:35PM": f"{branch_code}302-Compiler Design ~ 41202 ~ Compiler Design",
+                        "1:25PM - 2:15PM": f"{branch_code}PL02-Networks Lab ~ 42525 ~ Computer Networks Lab",
+                        "2:15PM - 3:05PM": f"{branch_code}PL02-Networks Lab ~ 42525 ~ Computer Networks Lab",
+                        "3:20PM - 4:10PM": "Sports / Physical Activity ~ 40002 ~ Activity"
+                    }
+                },
+                {
+                    "day": "WED",
+                    "timeSlots": {
+                        "9:00AM - 9:50AM": f"{branch_code}304-Cloud Computing ~ 41204 ~ Cloud Computing",
+                        "9:50AM - 10:40AM": f"{branch_code}305-Web Technologies ~ 41205 ~ Web Technologies",
+                        "10:55AM - 11:45AM": f"{branch_code}301-Machine Learning ~ 41201 ~ Machine Learning",
+                        "11:45AM - 12:35PM": f"{branch_code}303-Computer Networks ~ 41203 ~ Computer Networks",
+                        "1:25PM - 2:15PM": "Placement Training ~ 40101 ~ Aptitude & Verbal",
+                        "2:15PM - 3:05PM": "Placement Training ~ 40101 ~ Coding & DSA",
+                        "3:20PM - 4:10PM": "Mentoring Hour ~ 40003 ~ Mentor Discussion"
+                    }
+                },
+                {
+                    "day": "THU",
+                    "timeSlots": {
+                        "9:00AM - 9:50AM": f"{branch_code}302-Compiler Design ~ 41202 ~ Compiler Design",
+                        "9:50AM - 10:40AM": f"{branch_code}304-Cloud Computing ~ 41204 ~ Cloud Computing",
+                        "10:55AM - 11:45AM": f"{branch_code}305-Web Technologies ~ 41205 ~ Web Technologies",
+                        "11:45AM - 12:35PM": f"{branch_code}301-Machine Learning ~ 41201 ~ Machine Learning",
+                        "1:25PM - 2:15PM": f"{branch_code}PL03-Cloud Lab ~ 42526 ~ Cloud Computing Lab",
+                        "2:15PM - 3:05PM": f"{branch_code}PL03-Cloud Lab ~ 42526 ~ Cloud Computing Lab",
+                        "3:20PM - 4:10PM": "Technical Seminar ~ 40004 ~ Project Seminar"
+                    }
+                },
+                {
+                    "day": "FRI",
+                    "timeSlots": {
+                        "9:00AM - 9:50AM": f"{branch_code}305-Web Technologies ~ 41205 ~ Web Technologies",
+                        "9:50AM - 10:40AM": f"{branch_code}303-Computer Networks ~ 41203 ~ Computer Networks",
+                        "10:55AM - 11:45AM": f"{branch_code}302-Compiler Design ~ 41202 ~ Compiler Design",
+                        "11:45AM - 12:35PM": f"{branch_code}304-Cloud Computing ~ 41204 ~ Cloud Computing",
+                        "1:25PM - 2:15PM": f"{branch_code}PL04-Web Lab ~ 42527 ~ Web Development Lab",
+                        "2:15PM - 3:05PM": f"{branch_code}PL04-Web Lab ~ 42527 ~ Web Development Lab",
+                        "3:20PM - 4:10PM": "Club Activities ~ 40005 ~ E-Cell / Coding Club"
+                    }
+                },
+                {
+                    "day": "SAT",
+                    "timeSlots": {
+                        "9:00AM - 9:50AM": f"{branch_code}301-Machine Learning ~ 41201 ~ Machine Learning Revision",
+                        "9:50AM - 10:40AM": f"{branch_code}302-Compiler Design ~ 41202 ~ Tutorial Session",
+                        "10:55AM - 11:45AM": "Skillrack Practice ~ 40006 ~ Online Assessment",
+                        "11:45AM - 12:35PM": "Career Guidance ~ 40007 ~ Guest Lecture"
+                    }
+                }
+            ]
+        },
+        "pending_fees": {
+            "success": True,
+            "message": "Fees list retrieved successfully.",
+            "data": [
+                {
+                    "feeGroupId": 1,
+                    "feeGroupName": "Tuition Fee",
+                    "totalAmount": 105000,
+                    "paidAmount": 105000,
+                    "balanceAmount": 0,
+                    "dueDate": "2026-08-30",
+                    "status": "Paid"
+                },
+                {
+                    "feeGroupId": 2,
+                    "feeGroupName": "Special Training & Placement Fee",
+                    "totalAmount": 15000,
+                    "paidAmount": 15000,
+                    "balanceAmount": 0,
+                    "dueDate": "2026-09-15",
+                    "status": "Paid"
+                },
+                {
+                    "feeGroupId": 3,
+                    "feeGroupName": "Exam & Laboratory Fee",
+                    "totalAmount": 5000,
+                    "paidAmount": 5000,
+                    "balanceAmount": 0,
+                    "dueDate": "2026-10-01",
+                    "status": "Paid"
+                }
+            ],
+            "statusCode": 200
+        },
+        "interviews": {
+            "success": True,
+            "message": "Interview details retrieved successfully.",
+            "data": {
+                "data": [
+                    {
+                        "interviewId": 1538,
+                        "companyName": "Photon Interactive Private Limited",
+                        "companyCode": "Photon",
+                        "interviewDate": "2026-09-18T09:00:00",
+                        "applyLastDate": "2026-09-15T23:59:59",
+                        "salaryPackage": "7.5 - 9.0 LPA",
+                        "ugcgpa": 6.5,
+                        "historyOfArrear": 2,
+                        "tenthPercentage": 60.0,
+                        "twelthPercentage": 60.0,
+                        "interviewProcess": "Online Assessment, Technical Interview, HR Round",
+                        "status": "Registration Open"
+                    },
+                    {
+                        "interviewId": 1542,
+                        "companyName": "Zoho Corporation",
+                        "companyCode": "Zoho",
+                        "interviewDate": "2026-09-24T08:30:00",
+                        "applyLastDate": "2026-09-20T18:00:00",
+                        "salaryPackage": "8.5 - 12.0 LPA",
+                        "ugcgpa": 6.0,
+                        "historyOfArrear": 1,
+                        "tenthPercentage": 60.0,
+                        "twelthPercentage": 60.0,
+                        "interviewProcess": "Written Aptitude, Coding & DSA, Advanced Programming, HR",
+                        "status": "Eligible"
+                    },
+                    {
+                        "interviewId": 1545,
+                        "companyName": "MRF Limited",
+                        "companyCode": "MRF",
+                        "interviewDate": "2026-10-02T09:00:00",
+                        "applyLastDate": "2026-09-28T17:00:00",
+                        "salaryPackage": "6.0 LPA",
+                        "ugcgpa": 6.0,
+                        "historyOfArrear": 3,
+                        "tenthPercentage": 60.0,
+                        "twelthPercentage": 60.0,
+                        "interviewProcess": "Technical Presentation, Personal Interview",
+                        "status": "Upcoming"
+                    }
+                ],
+                "totalCount": 3
+            }
+        },
+        "resume": {
+            "success": True,
+            "data": [
+                {
+                    "isResumeAvailable": True,
+                    "fileName": f"{reg_no}_Resume.pdf",
+                    "resumeFileName": f"{reg_no}_Resume.pdf"
+                }
+            ],
+            "statusCode": 200
+        },
+        "clubs": {
+            "success": True,
+            "message": "Student club info retrieved successfully.",
+            "data": [
+                {
+                    "institutionCode": inst_id,
+                    "academic_year_Name": academic_year,
+                    "studentName": name,
+                    "studentId": reg_no,
+                    "branch_Code": branch_code,
+                    "yearOfStudy_Name": f"Year {year_of_study}",
+                    "section_Name": section,
+                    "clubName": "Entrepreneurship Cell, M-Apps Club, Skill Development Club, Coding Club",
+                    "mentorName": f"Dr. {TEST_LAST_NAMES[rng.randint(0, len(TEST_LAST_NAMES)-1)]}",
+                    "staff_Code": "ET20EC08"
+                }
+            ],
+            "statusCode": 200
         }
     }
     return context
@@ -1952,6 +2142,167 @@ async def download_inbox_doc(request: Request, studtblId: str, documentId: str, 
             )
     except Exception as e:
         return {"error": str(e)}
+
+# ============================================================
+#  TIMETABLE
+# ============================================================
+@app.get("/api/dashboard/timetable")
+async def get_weekly_timetable(
+    request: Request,
+    studtblId: str,
+    branchId: Optional[int] = None,
+    yearOfStudyId: Optional[int] = None,
+    sectionId: Optional[int] = None,
+    semesterId: Optional[int] = None,
+    academicYearId: Optional[int] = None
+):
+    studtblId = fix_id(studtblId)
+    await validate_request_authorization(request, studtblId, "/api/dashboard/timetable")
+    test_ctx = _get_test_context(request, studtblId)
+    if test_ctx and "timetable" in test_ctx:
+        return test_ctx["timetable"]
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Dashboard/GetWeeklyTimetableByClass"
+    params: dict = {"studtblId": studtblId}
+    if branchId is not None: params["branchId"] = branchId
+    if yearOfStudyId is not None: params["yearOfStudyId"] = yearOfStudyId
+    if sectionId is not None: params["sectionId"] = sectionId
+    if semesterId is not None: params["semesterId"] = semesterId
+    if academicYearId is not None: params["academicYearId"] = academicYearId
+
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception: pass
+    return {"success": False, "message": "Failed to fetch timetable", "data": []}
+
+# ============================================================
+#  FINANCE & FEES
+# ============================================================
+@app.get("/api/finance/pending-fees")
+async def get_pending_fees(
+    request: Request,
+    studtblId: str,
+    academicYearId: Optional[int] = None,
+    branchId: Optional[int] = None,
+    semesterId: Optional[int] = None,
+    sectionId: Optional[int] = None
+):
+    studtblId = fix_id(studtblId)
+    await validate_request_authorization(request, studtblId, "/api/finance/pending-fees")
+    test_ctx = _get_test_context(request, studtblId)
+    if test_ctx and "pending_fees" in test_ctx:
+        return test_ctx["pending_fees"]
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/PayUp/GetPendingFeesGroupListByStudentId"
+    params: dict = {"studtblId": studtblId}
+    if academicYearId is not None: params["academicYearId"] = academicYearId
+    if branchId is not None: params["branchId"] = branchId
+    if semesterId is not None: params["semesterId"] = semesterId
+    if sectionId is not None: params["sectionId"] = sectionId
+
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception: pass
+    return {"success": True, "message": "No pending fees", "data": []}
+
+# ============================================================
+#  PLACEMENT & CAREER
+# ============================================================
+@app.get("/api/placement/interviews")
+async def get_placement_interviews(
+    request: Request,
+    studtblId: str,
+    yearId: Optional[int] = 4,
+    academicYearId: Optional[int] = None,
+    searchText: str = "",
+    pageNumber: int = 1,
+    pageSize: int = 20
+):
+    studtblId = fix_id(studtblId)
+    await validate_request_authorization(request, studtblId, "/api/placement/interviews")
+    test_ctx = _get_test_context(request, studtblId)
+    if test_ctx and "interviews" in test_ctx:
+        return test_ctx["interviews"]
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Myjob/GetInterviewList"
+    params: dict = {
+        "studtblId": studtblId,
+        "yearId": yearId,
+        "SearchText": searchText,
+        "pageNumber": pageNumber,
+        "pageSize": pageSize
+    }
+    if academicYearId is not None:
+        params["academicYearId"] = academicYearId
+
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params=params, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception: pass
+    return {"success": False, "message": "Failed to fetch interviews", "data": {"data": [], "totalCount": 0}}
+
+@app.get("/api/placement/resume")
+async def get_placement_resume(request: Request, studtblId: str):
+    studtblId = fix_id(studtblId)
+    await validate_request_authorization(request, studtblId, "/api/placement/resume")
+    test_ctx = _get_test_context(request, studtblId)
+    if test_ctx and "resume" in test_ctx:
+        return test_ctx["resume"]
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Myjob/GetResumeFileNameById"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception: pass
+    return {"success": True, "data": [{"isResumeAvailable": False}]}
+
+# ============================================================
+#  PROFILE CLUBS
+# ============================================================
+@app.get("/api/profile/clubs")
+async def get_student_clubs(request: Request, studtblId: str):
+    studtblId = fix_id(studtblId)
+    await validate_request_authorization(request, studtblId, "/api/profile/clubs")
+    test_ctx = _get_test_context(request, studtblId)
+    if test_ctx and "clubs" in test_ctx:
+        return test_ctx["clubs"]
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Student/GetStudentClubInfo"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"studtblId": studtblId}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception: pass
+    return {"success": True, "data": []}
+
+# ============================================================
+#  INBOX UNREAD COUNT
+# ============================================================
+@app.get("/api/inbox/unread-count")
+async def get_inbox_unread_count(request: Request, receiver: str):
+    test_ctx = _get_test_context(request)
+    if test_ctx:
+        return {"success": True, "unreadCount": 1}
+
+    base_url, headers = get_institution_config(request)
+    upstream_url = f"{base_url}/Inbox/GetUnreadCategories"
+    try:
+        async with get_client(request) as client:
+            resp = await client.get(upstream_url, params={"Receiver": receiver}, headers=headers)
+            if resp.status_code == 200: return resp.json()
+    except Exception: pass
+    return {"success": False, "unreadCount": 0}
 
 if __name__ == "__main__":
     import uvicorn

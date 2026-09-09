@@ -7,7 +7,8 @@ import {
     FileText, LogOut, AlertCircle, Loader2,
     User, TrendingUp, Award, Users, Menu, Upload,
     CheckCircle2, XCircle, Mail, Phone, Bus, Inbox,
-    Download, X, ChevronRight, Sparkles, Heart, ExternalLink
+    Download, X, ChevronRight, Sparkles, Heart, ExternalLink,
+    Clock, CreditCard, Briefcase
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AttendanceCalendar } from '@/components/AttendanceCalendar';
@@ -26,6 +27,12 @@ import ProfileOverviewTab from './profile_components/ProfileOverviewTab';
 import { ProfileImage } from '@/components/ProfileImage';
 import DocumentUploadView from './document_components/DocumentUploadView';
 import InboxView from './inbox_components/InboxView';
+
+// Phase 2 New Feature Components
+import { TimetableCard } from './timetable_components/TimetableCard';
+import { TimetableModal } from './timetable_components/TimetableModal';
+import { FinanceView } from './finance_components/FinanceView';
+import { PlacementView } from './placement_components/PlacementView';
 
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -161,8 +168,25 @@ export default function Dashboard() {
     const [arrearsData, setArrearsData] = useState<any[]>([]);
     const [isArrearModalOpen, setIsArrearModalOpen] = useState(false);
 
+    // Timetable State
+    const [timetableData, setTimetableData] = useState<any[]>([]);
+    const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
+
+    // Finance & Fees State
+    const [feesData, setFeesData] = useState<any[]>([]);
+
+    // Placement & Interviews State
+    const [interviewsData, setInterviewsData] = useState<any[]>([]);
+    const [resumeData, setResumeData] = useState<any>(null);
+
+    // Clubs State
+    const [clubsData, setClubsData] = useState<any[]>([]);
+
+    // Unread Notifications Count
+    const [unreadCount, setUnreadCount] = useState<number>(0);
+
     // Bottom nav tab
-    const [activeTab, setActiveTab] = useState<NavTab | 'hallticket' | 'documents' | 'inbox'>('home');
+    const [activeTab, setActiveTab] = useState<NavTab>('home');
     const [activeSubTab, setActiveSubTab] = useState<'profile' | 'campus' | 'achievements' | 'course' | 'attendance'>('profile');
 
     // Menu State
@@ -337,12 +361,11 @@ export default function Dashboard() {
         finally { setReportLoading(false); }
     }, [activeReport, studtblId]);
 
-    /* ── Debug: Trigger Attendance Endpoints ── */
-    /* ── Fetch Attendance Data (Once Academic Data is ready) ── */
+    /* ── Fetch Extended Data (Once Academic Data is ready) ── */
     useEffect(() => {
         if (!studtblId || !academic) return;
 
-        const fetchAttendance = async () => {
+        const fetchExtendedData = async () => {
             setAttendanceLoading(true);
             setAttendanceError(null);
             const headers = {
@@ -358,17 +381,53 @@ export default function Dashboard() {
                 semesterId: String(academic.semester ?? 6),
                 yearOfStudyId: String(academic.year_of_study_id ?? 3),
                 sectionId: String(academic.section_id ?? 1),
-                programmeId: String(academic.program_id ?? 1), // usually programme_id is 1 or comes from academic if added later
+                programmeId: String(academic.program_id ?? 1),
                 semesterType: academic.semester_type || 'Even'
             });
 
+            // Timetable params
+            const timetableParams = new URLSearchParams({
+                studtblId,
+                branchId: String(academic.branch_id ?? 2),
+                yearOfStudyId: String(academic.year_of_study_id ?? 3),
+                sectionId: String(academic.section_id ?? 1),
+                semesterId: String(academic.semester ?? 6),
+                academicYearId: String(academic.academic_year_id ?? 14)
+            });
+
+            // Fees params
+            const feesParams = new URLSearchParams({
+                studtblId,
+                academicYearId: String(academic.academic_year_id ?? 14),
+                branchId: String(academic.branch_id ?? 2),
+                semesterId: String(academic.semester ?? 6),
+                sectionId: String(academic.section_id ?? 1)
+            });
+
+            // Placement params
+            const placementParams = new URLSearchParams({
+                studtblId,
+                yearId: String(academic.year_of_study_id ?? 4),
+                academicYearId: String(academic.academic_year_id ?? 14),
+                pageNumber: '1',
+                pageSize: '20'
+            });
+
             try {
-                const [dailyRes, leaveRes, courseRes, examRes, arrearsRes] = await Promise.all([
+                const [
+                    dailyRes, leaveRes, courseRes, examRes, arrearsRes,
+                    timetableRes, feesRes, interviewsRes, resumeRes, clubsRes
+                ] = await Promise.all([
                     fetch(`${API}/api/attendance/daily-detail?${params}`, { headers }),
                     fetch(`${API}/api/attendance/leave-status?${params}`, { headers }),
                     fetch(`${API}/api/attendance/course-detail?${params}`, { headers }),
                     fetch(`${API}/api/student/exam-status?${params}`, { headers }),
-                    fetch(`${API}/api/student/arrears?${params}`, { headers })
+                    fetch(`${API}/api/student/arrears?${params}`, { headers }),
+                    fetch(`${API}/api/dashboard/timetable?${timetableParams}`, { headers }),
+                    fetch(`${API}/api/finance/pending-fees?${feesParams}`, { headers }),
+                    fetch(`${API}/api/placement/interviews?${placementParams}`, { headers }),
+                    fetch(`${API}/api/placement/resume?studtblId=${encodeURIComponent(studtblId)}`, { headers }),
+                    fetch(`${API}/api/profile/clubs?studtblId=${encodeURIComponent(studtblId)}`, { headers })
                 ]);
 
                 const errors: string[] = [];
@@ -399,17 +458,67 @@ export default function Dashboard() {
                     setAttendanceCourse(Array.isArray(courseJson.data) ? courseJson.data : []);
                 } else if (courseJson.error) errors.push(courseJson.error);
 
+                // Process Timetable
+                if (timetableRes.ok) {
+                    const tJson = await timetableRes.json().catch(() => ({}));
+                    if (tJson.success && Array.isArray(tJson.data)) {
+                        setTimetableData(tJson.data);
+                    }
+                }
+
+                // Process Fees
+                if (feesRes.ok) {
+                    const fJson = await feesRes.json().catch(() => ({}));
+                    if (fJson.success && Array.isArray(fJson.data)) {
+                        setFeesData(fJson.data);
+                    }
+                }
+
+                // Process Placement Interviews & Resume
+                if (interviewsRes.ok) {
+                    const iJson = await interviewsRes.json().catch(() => ({}));
+                    if (iJson.success && Array.isArray(iJson.data)) {
+                        setInterviewsData(iJson.data);
+                    }
+                }
+                if (resumeRes.ok) {
+                    const rJson = await resumeRes.json().catch(() => ({}));
+                    if (rJson.success && rJson.data) {
+                        setResumeData(rJson.data);
+                    }
+                }
+
+                // Process Clubs
+                if (clubsRes.ok) {
+                    const cJson = await clubsRes.json().catch(() => ({}));
+                    if (cJson.success && Array.isArray(cJson.data)) {
+                        setClubsData(cJson.data);
+                    }
+                }
+
+                // Fetch Unread Count
+                if (personal?.reg_no) {
+                    fetch(`${API}/api/inbox/unread-count?receiver=${encodeURIComponent(personal.reg_no)}`, { headers })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(uJson => {
+                            if (uJson?.unread_count !== undefined) {
+                                setUnreadCount(uJson.unread_count);
+                            }
+                        })
+                        .catch(() => {});
+                }
+
                 if (errors.length > 0) setAttendanceError(errors.join('. '));
             } catch (err) {
-                console.error("Failed to load attendance", err);
+                console.error("Failed to load extended data", err);
                 setAttendanceError('Network error. Please check your connection.');
             } finally {
                 setAttendanceLoading(false);
             }
         };
 
-        fetchAttendance();
-    }, [studtblId, academic]);
+        fetchExtendedData();
+    }, [studtblId, academic, personal?.reg_no]);
 
     /* ── Skeleton Loading screen — shows real layout immediately for fast LCP ── */
     if (loading) {
@@ -571,6 +680,67 @@ export default function Dashboard() {
                                 </div>
                             </motion.div>
 
+                            {/* ━━━━━━━━━━ Quick Portals Bar ━━━━━━━━━━ */}
+                            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                                className="flex items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                                <button
+                                    onClick={() => setActiveTab('timetable')}
+                                    className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 hover:border-cyan-400 text-slate-700 hover:text-cyan-700 text-xs font-bold transition-all shadow-sm active:scale-95 group"
+                                >
+                                    <div className="p-1 rounded-lg bg-cyan-50 text-cyan-600 group-hover:bg-cyan-100"><Clock size={14} /></div>
+                                    <span>Timetable</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('finance')}
+                                    className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 hover:border-emerald-400 text-slate-700 hover:text-emerald-700 text-xs font-bold transition-all shadow-sm active:scale-95 group"
+                                >
+                                    <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100"><CreditCard size={14} /></div>
+                                    <span>Finance & Fees</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('placement')}
+                                    className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 hover:border-violet-400 text-slate-700 hover:text-violet-700 text-xs font-bold transition-all shadow-sm active:scale-95 group"
+                                >
+                                    <div className="p-1 rounded-lg bg-violet-50 text-violet-600 group-hover:bg-violet-100"><Briefcase size={14} /></div>
+                                    <span>Placements</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('hallticket')}
+                                    className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 hover:border-indigo-400 text-slate-700 hover:text-indigo-700 text-xs font-bold transition-all shadow-sm active:scale-95 group"
+                                >
+                                    <div className="p-1 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100"><FileText size={14} /></div>
+                                    <span>Hall Ticket</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('documents')}
+                                    className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 hover:border-teal-400 text-slate-700 hover:text-teal-700 text-xs font-bold transition-all shadow-sm active:scale-95 group"
+                                >
+                                    <div className="p-1 rounded-lg bg-teal-50 text-teal-600 group-hover:bg-teal-100"><Upload size={14} /></div>
+                                    <span>Documents</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('inbox')}
+                                    className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 hover:border-amber-400 text-slate-700 hover:text-amber-700 text-xs font-bold transition-all shadow-sm active:scale-95 group relative"
+                                >
+                                    <div className="p-1 rounded-lg bg-amber-50 text-amber-600 group-hover:bg-amber-100"><Inbox size={14} /></div>
+                                    <span>Inbox</span>
+                                    {unreadCount > 0 && (
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                                            {unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+                            </motion.div>
+
+                            {/* ━━━━━━━━━━ Today's Schedule Card ━━━━━━━━━━ */}
+                            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                                <TimetableCard
+                                    timetableData={timetableData}
+                                    loading={attendanceLoading}
+                                    onOpenFullModal={() => setIsTimetableModalOpen(true)}
+                                />
+                            </motion.div>
+
                             {/* ━━━━━━━━━━ ROW 2: Analytics (Attendance Ring + Quick Info) ━━━━━━━━━━ */}
                             <div className="space-y-3 sm:space-y-4">
 
@@ -707,7 +877,7 @@ export default function Dashboard() {
                                         transition={{ duration: 0.2 }}
                                         className="space-y-3 sm:space-y-4"
                                     >
-                                        <ProfileOverviewTab personal={personal} academic={academic} parent={parentData} />
+                                        <ProfileOverviewTab personal={personal} academic={academic} parent={parentData} clubs={clubsData} />
 
                                         {/* ── Debug Section ── */}
                                         {stats?.raw_data && (
@@ -1000,7 +1170,74 @@ export default function Dashboard() {
                             />
                         </motion.div>
                     )}
+
+                    {activeTab === 'timetable' && (
+                        <motion.div
+                            key="timetable"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="space-y-4 pt-2 sm:pt-4"
+                        >
+                            <TimetableCard
+                                timetableData={timetableData}
+                                loading={attendanceLoading}
+                                onOpenFullModal={() => setIsTimetableModalOpen(true)}
+                            />
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'finance' && (
+                        <motion.div
+                            key="finance"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="pt-2 sm:pt-4"
+                        >
+                            <FinanceView
+                                feesData={feesData}
+                                examStatus={stats}
+                                loading={attendanceLoading}
+                            />
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'placement' && (
+                        <motion.div
+                            key="placement"
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 12 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="pt-2 sm:pt-4"
+                        >
+                            <PlacementView
+                                interviewsData={interviewsData}
+                                studentCgpa={stats?.cgpa || 0}
+                                studentArrears={stats?.arrears || 0}
+                                resumeData={resumeData}
+                                loading={attendanceLoading}
+                            />
+                        </motion.div>
+                    )}
                 </AnimatePresence>
+
+                {/* Timetable Master Modal */}
+                <TimetableModal
+                    isOpen={isTimetableModalOpen}
+                    onClose={() => setIsTimetableModalOpen(false)}
+                    timetableData={timetableData}
+                    studentInfo={{
+                        name: personal?.name,
+                        regNo: personal?.reg_no,
+                        branch: academic?.dept,
+                        semester: academic?.semester,
+                        section: academic?.section
+                    }}
+                />
 
                 {/* Arrears Modal */}
                 <AnimatePresence>
@@ -1024,7 +1261,7 @@ export default function Dashboard() {
                                 <div className="p-6 max-h-[60vh] overflow-y-auto">
                                     {arrearsData && arrearsData.length > 0 ? (
                                         <div className="space-y-3">
-                                            {arrearsData.map((arr: any, i: number) => (
+                                             {arrearsData.map((arr: any, i: number) => (
                                                 <div key={i} className="p-4 rounded-xl bg-rose-50/50 border border-rose-100/50">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-600">
@@ -1056,7 +1293,7 @@ export default function Dashboard() {
             </motion.main>
 
             {/* ═══════════════════════ BOTTOM NAV ═══════════════════════ */}
-            <BottomNav activeTab={activeTab as NavTab} onTabChange={setActiveTab} />
+            <BottomNav activeTab={activeTab as NavTab} onTabChange={setActiveTab} unreadCount={unreadCount} />
 
             {/* ═══════════════════════ FOOTER (Desktop only) ═══════════════════════ */}
             <footer className="hidden md:block mt-auto border-t border-slate-100/80 bg-white/95">
