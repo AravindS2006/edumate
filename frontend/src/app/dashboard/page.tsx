@@ -172,11 +172,13 @@ export default function Dashboard() {
     const [timetableData, setTimetableData] = useState<any[]>([]);
     const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
 
-    // Finance & Fees State
-    const [feesData, setFeesData] = useState<any[]>([]);
+    // Exam Status & Finance State
+    const [examStatus, setExamStatus] = useState<any>(null);
+    const [feesData, setFeesData] = useState<any>(null);
 
     // Placement & Interviews State
     const [interviewsData, setInterviewsData] = useState<any[]>([]);
+    const [internshipsData, setInternshipsData] = useState<any>(null);
     const [resumeData, setResumeData] = useState<any>(null);
 
     // Clubs State
@@ -416,7 +418,7 @@ export default function Dashboard() {
             try {
                 const [
                     dailyRes, leaveRes, courseRes, examRes, arrearsRes,
-                    timetableRes, feesRes, interviewsRes, resumeRes, clubsRes
+                    timetableRes, feesRes, interviewsRes, internshipsRes, resumeRes, clubsRes
                 ] = await Promise.all([
                     fetch(`${API}/api/attendance/daily-detail?${params}`, { headers }),
                     fetch(`${API}/api/attendance/leave-status?${params}`, { headers }),
@@ -426,6 +428,7 @@ export default function Dashboard() {
                     fetch(`${API}/api/dashboard/timetable?${timetableParams}`, { headers }),
                     fetch(`${API}/api/finance/pending-fees?${feesParams}`, { headers }),
                     fetch(`${API}/api/placement/interviews?${placementParams}`, { headers }),
+                    fetch(`${API}/api/placement/internships?${placementParams}`, { headers }),
                     fetch(`${API}/api/placement/resume?studtblId=${encodeURIComponent(studtblId)}`, { headers }),
                     fetch(`${API}/api/profile/clubs?studtblId=${encodeURIComponent(studtblId)}`, { headers })
                 ]);
@@ -435,6 +438,10 @@ export default function Dashboard() {
                 // Process Exam Status & Arrears
                 const examJson = await examRes.json().catch(() => ({}));
                 const arrearsJson = await arrearsRes.json().catch(() => ({}));
+
+                if (examRes.ok && !examJson.error) {
+                    setExamStatus(examJson);
+                }
 
                 if (arrearsRes.ok && arrearsJson.success) {
                     setArrearsData(arrearsJson.data || []);
@@ -469,16 +476,25 @@ export default function Dashboard() {
                 // Process Fees
                 if (feesRes.ok) {
                     const fJson = await feesRes.json().catch(() => ({}));
-                    if (fJson.success && Array.isArray(fJson.data)) {
-                        setFeesData(fJson.data);
+                    if (fJson.success) {
+                        setFeesData(fJson);
+                    } else if (Array.isArray(fJson)) {
+                        setFeesData({ data: fJson });
                     }
                 }
 
-                // Process Placement Interviews & Resume
+                // Process Placement Interviews, Internships & Resume
                 if (interviewsRes.ok) {
                     const iJson = await interviewsRes.json().catch(() => ({}));
-                    if (iJson.success && Array.isArray(iJson.data)) {
-                        setInterviewsData(iJson.data);
+                    if (iJson.success) {
+                        const list = Array.isArray(iJson.data) ? iJson.data : (Array.isArray(iJson.data?.data) ? iJson.data.data : []);
+                        setInterviewsData(list);
+                    }
+                }
+                if (internshipsRes.ok) {
+                    const intJson = await internshipsRes.json().catch(() => ({}));
+                    if (intJson.success) {
+                        setInternshipsData(intJson);
                     }
                 }
                 if (resumeRes.ok) {
@@ -1199,7 +1215,8 @@ export default function Dashboard() {
                         >
                             <FinanceView
                                 feesData={feesData}
-                                examStatus={stats}
+                                examStatus={examStatus}
+                                academic={academic}
                                 loading={attendanceLoading}
                             />
                         </motion.div>
@@ -1216,6 +1233,7 @@ export default function Dashboard() {
                         >
                             <PlacementView
                                 interviewsData={interviewsData}
+                                internshipsData={internshipsData}
                                 studentCgpa={stats?.cgpa || 0}
                                 studentArrears={stats?.arrears || 0}
                                 resumeData={resumeData}

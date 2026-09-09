@@ -572,53 +572,71 @@ def _get_test_context(request: Request, requested_studtbl_id: Optional[str] = No
         "interviews": {
             "success": True,
             "message": "Interview details retrieved successfully.",
-            "data": {
-                "data": [
-                    {
-                        "interviewId": 1538,
-                        "companyName": "Photon Interactive Private Limited",
-                        "companyCode": "Photon",
-                        "interviewDate": "2026-09-18T09:00:00",
-                        "applyLastDate": "2026-09-15T23:59:59",
-                        "salaryPackage": "7.5 - 9.0 LPA",
-                        "ugcgpa": 6.5,
-                        "historyOfArrear": 2,
-                        "tenthPercentage": 60.0,
-                        "twelthPercentage": 60.0,
-                        "interviewProcess": "Online Assessment, Technical Interview, HR Round",
-                        "status": "Registration Open"
-                    },
-                    {
-                        "interviewId": 1542,
-                        "companyName": "Zoho Corporation",
-                        "companyCode": "Zoho",
-                        "interviewDate": "2026-09-24T08:30:00",
-                        "applyLastDate": "2026-09-20T18:00:00",
-                        "salaryPackage": "8.5 - 12.0 LPA",
-                        "ugcgpa": 6.0,
-                        "historyOfArrear": 1,
-                        "tenthPercentage": 60.0,
-                        "twelthPercentage": 60.0,
-                        "interviewProcess": "Written Aptitude, Coding & DSA, Advanced Programming, HR",
-                        "status": "Eligible"
-                    },
-                    {
-                        "interviewId": 1545,
-                        "companyName": "MRF Limited",
-                        "companyCode": "MRF",
-                        "interviewDate": "2026-10-02T09:00:00",
-                        "applyLastDate": "2026-09-28T17:00:00",
-                        "salaryPackage": "6.0 LPA",
-                        "ugcgpa": 6.0,
-                        "historyOfArrear": 3,
-                        "tenthPercentage": 60.0,
-                        "twelthPercentage": 60.0,
-                        "interviewProcess": "Technical Presentation, Personal Interview",
-                        "status": "Upcoming"
-                    }
-                ],
-                "totalCount": 3
-            }
+            "data": [
+                {
+                    "interviewId": 1538,
+                    "companyName": "Photon Interactive Private Limited",
+                    "companyCode": "Photon",
+                    "interviewDate": "2026-09-18T09:00:00",
+                    "applyLastDate": "2026-09-15T23:59:59",
+                    "salaryPackage": "₹10,000–₹12,000 Stipend - FTE 4.5 LPA",
+                    "ugcgpa": 6.5,
+                    "historyOfArrear": 2,
+                    "tenthPercentage": 60.0,
+                    "twelthPercentage": 60.0,
+                    "interviewProcess": "Online Assessment, Technical Interview, HR Round",
+                    "eligibleStatus": "Eligible",
+                    "status": "Registration Open"
+                },
+                {
+                    "interviewId": 1542,
+                    "companyName": "Zoho Corporation",
+                    "companyCode": "Zoho",
+                    "interviewDate": "2026-09-24T08:30:00",
+                    "applyLastDate": "2026-09-20T18:00:00",
+                    "salaryPackage": "₹8.5 - ₹12.0 LPA",
+                    "ugcgpa": 6.0,
+                    "historyOfArrear": 1,
+                    "tenthPercentage": 60.0,
+                    "twelthPercentage": 60.0,
+                    "interviewProcess": "Written Aptitude, Coding & DSA, Advanced Programming, HR",
+                    "eligibleStatus": "Eligible",
+                    "status": "Eligible"
+                },
+                {
+                    "interviewId": 1545,
+                    "companyName": "MRF Limited",
+                    "companyCode": "MRF",
+                    "interviewDate": "2026-10-02T09:00:00",
+                    "applyLastDate": "2026-09-28T17:00:00",
+                    "salaryPackage": "₹6.0 LPA",
+                    "ugcgpa": 6.0,
+                    "historyOfArrear": 3,
+                    "tenthPercentage": 60.0,
+                    "twelthPercentage": 60.0,
+                    "interviewProcess": "Technical Presentation, Personal Interview",
+                    "eligibleStatus": "Eligible",
+                    "status": "Upcoming"
+                }
+            ],
+            "totalCount": 3
+        },
+        "internships": {
+            "success": True,
+            "companies": [
+                {"id": 11595, "companyName": "10 Decoders Consultancy Services Private Limited"},
+                {"id": 11272, "companyName": "10xrich Travel Technology Private Limited"},
+                {"id": 11675, "companyName": "1m1b Foundation"},
+                {"id": 11640, "companyName": "3 Circle Engineering Private Limited"},
+                {"id": 12467, "companyName": "4 Friends Interactive"}
+            ],
+            "history": [],
+            "master": [
+                {"id": 1, "masterType": "Mode", "masterData": "Online", "isActive": True},
+                {"id": 2, "masterType": "Mode", "masterData": "Offline", "isActive": True},
+                {"id": 3, "masterType": "Type", "masterData": "Core", "isActive": True},
+                {"id": 4, "masterType": "Type", "masterData": "Non-Core", "isActive": True}
+            ]
         },
         "resume": {
             "success": True,
@@ -1093,6 +1111,11 @@ async def get_exam_status(request: Request, studtblId: str,
                     "total_fees": raw.get("fees", 0),
                     "paid_online": raw.get("onlinePaymentFees", 0),
                     "previous_due": raw.get("previousFeeDue", 0),
+                    "trust_office_fees": raw.get("trustOfficeFees", 0),
+                    "hostel_fees": raw.get("hostelFees", 0),
+                    "book_fees": raw.get("bookFees", 0),
+                    "fee_status": raw.get("feeStatus", ""),
+                    "is_submit_enabled": raw.get("isSubmitEnabled", False),
                     "attendance_pct": raw.get("attendancePercentage", 0),
                     "od_pct": raw.get("odPercentage", 0),
                     # Potential new fields
@@ -2207,9 +2230,37 @@ async def get_pending_fees(
     try:
         async with get_client(request) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
-            if resp.status_code == 200: return resp.json()
+            fees_data = []
+            if resp.status_code == 200:
+                json_body = resp.json()
+                if isinstance(json_body, dict):
+                    fees_data = json_body.get("data", [])
+
+            notes = []
+            curr = {"currencySymbol": "₹", "currencyCode": "INR"}
+            try:
+                notes_resp = await client.get(f"{base_url}/HallTicket/GetGlobalStaticNotesByCategory", params={"Category": "PayUp", "ReferenceId": "P001"}, headers=headers)
+                if notes_resp.status_code == 200:
+                    notes = notes_resp.json().get("data", [])
+            except Exception: pass
+
+            try:
+                curr_resp = await client.get(f"{base_url}/PayUp/GetCurrencyMaster", headers=headers)
+                if curr_resp.status_code == 200:
+                    cd = curr_resp.json().get("data", [])
+                    if cd and len(cd) > 0: curr = cd[0]
+            except Exception: pass
+
+            return {
+                "success": True,
+                "message": "Fees retrieved successfully.",
+                "data": fees_data,
+                "notes": notes,
+                "currency": curr,
+                "isAllClear": len(fees_data) == 0
+            }
     except Exception: pass
-    return {"success": True, "message": "No pending fees", "data": []}
+    return {"success": True, "message": "No pending fees", "data": [], "isAllClear": True}
 
 # ============================================================
 #  PLACEMENT & CAREER
@@ -2245,9 +2296,51 @@ async def get_placement_interviews(
     try:
         async with get_client(request) as client:
             resp = await client.get(upstream_url, params=params, headers=headers)
-            if resp.status_code == 200: return resp.json()
+            if resp.status_code == 200:
+                raw_json = resp.json()
+                raw_data = raw_json.get("data")
+                if isinstance(raw_data, dict) and "data" in raw_data and isinstance(raw_data["data"], list):
+                    return {
+                        "success": True,
+                        "message": raw_json.get("message", "Success"),
+                        "data": raw_data["data"],
+                        "totalCount": raw_data.get("totalCount", len(raw_data["data"])),
+                        "raw": raw_data
+                    }
+                return raw_json
     except Exception: pass
-    return {"success": False, "message": "Failed to fetch interviews", "data": {"data": [], "totalCount": 0}}
+    return {"success": False, "message": "Failed to fetch interviews", "data": []}
+
+@app.get("/api/placement/internships")
+async def get_placement_internships(request: Request, studtblId: str):
+    studtblId = fix_id(studtblId)
+    await validate_request_authorization(request, studtblId, "/api/placement/internships")
+    test_ctx = _get_test_context(request, studtblId)
+    if test_ctx and "internships" in test_ctx:
+        return test_ctx["internships"]
+
+    base_url, headers = get_institution_config(request)
+    company_url = f"{base_url}/Internship/GetInternshipCompanyList"
+    history_url = f"{base_url}/Internship/GetInternshipHistory"
+    master_url = f"{base_url}/Internship/GetInternshipMasterData"
+    try:
+        async with get_client(request) as client:
+            comp_resp = await client.get(company_url, headers=headers)
+            hist_resp = await client.get(history_url, params={"studtblId": studtblId}, headers=headers)
+            mast_resp = await client.get(master_url, headers=headers)
+
+            companies = comp_resp.json().get("data", []) if comp_resp.status_code == 200 else []
+            history = hist_resp.json().get("data") if hist_resp.status_code == 200 else []
+            master = mast_resp.json().get("data", []) if mast_resp.status_code == 200 else []
+
+            return {
+                "success": True,
+                "companies": companies,
+                "history": history or [],
+                "master": master
+            }
+    except Exception: pass
+    return {"success": True, "companies": [], "history": [], "master": []}
 
 @app.get("/api/placement/resume")
 async def get_placement_resume(request: Request, studtblId: str):
